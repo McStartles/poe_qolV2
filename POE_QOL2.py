@@ -86,6 +86,7 @@ class MyApplication(pygubu.TkApplication):
         # TODO: Validate the Setup.ini file contents and formatting and instruct user how to fix it if necessary
         # TODO: Validate the default_filter.filter file contents and formatting and instruct user how to fix it if necessary
         # TODO: Restore the original main filter file one exit. I really am bad at handling exit callbacks
+        # TODO: The overlay widget doesn't seem to sync with the local stash record (self.latest_stash)
         # self.check_filter()  # This is legacy, to set the self.active_status parameter. I don't think that is needed anymore.
         #Note to self,  from trying a bunch of different resolutions and 3 monitors i found that,
         # stash/inv tabs had a fixed width to height ratio of 886/1440 (~0.6153)that must be obeyed.
