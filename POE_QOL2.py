@@ -136,6 +136,8 @@ class MyApplication(pygubu.TkApplication):
         #TODO: Use data about identified items
         self.unident, self.ident = self.stash_finder()
         # Since the app has asynchronous knowledge of the items in tab, we want to have some local record. We'll call that latest_stash and allow it to be changed.
+        # ~~~IMPORTANT~~~~: The remote snapshot and the local record are two separate dict parameters and a tuple of dicts. I need to change this for consistency
+        # TODO: refactor remote snapshot and local record to be either both tuples or both separate dicts for unidentified and identified items
         self.latest_stash = (self.unident.copy(), self.ident.copy())
         # initial dynamic filter update
         self.update_filter()
@@ -217,7 +219,8 @@ class MyApplication(pygubu.TkApplication):
         """
         t_check = datetime.datetime.now()  # get current time
         # compare local and remote stash inventories. short circuits if the refresh time has not elapsed
-        if (t_check - self.last_update) < datetime.timedelta(seconds=float(self.config['Config']['refresh_time'])) and self.latest_stash[0] == self.unident:
+        remote_inventory_unident, remote_inventory_ident = self.stash_finder()
+        if (t_check - self.last_update) < datetime.timedelta(seconds=float(self.config['Config']['refresh_time'])) and remote_inventory_unident == self.unident:
             self.synced = True
         else:
             self.synced = False
@@ -230,11 +233,14 @@ class MyApplication(pygubu.TkApplication):
         This is kind-of a Frakenstein code between legacy and my own.
         I did my best to re-implement the logic to handle the local/remote problem. -notaspy 14-9-2020
         """
-        # If the local inventory and the last snapshot are not sync'd, update the snap shot and the 
+        # If the local inventory and the last snapshot are not sync'd, update the remote snap shot and also make it the latest local stash inventory
         if not self.check_inventory_sync():
             self.unident, self.ident = self.stash_finder()
-            print(224, self.unident, self.ident)
             self.latest_stash = (self.unident, self.ident)
+            if DEBUG:
+                pp.pprint(self.unident)
+        # legacy test for existance of the attributes. kinda tried to refactor it. Functional but not pretty. 
+        # Notice the different syntax for the remote snapshot and the local record (ie local is a tuple of dicts)
         try:
             self.unident
             self.latest_stash[0]
@@ -242,50 +248,61 @@ class MyApplication(pygubu.TkApplication):
             self.unident, self.ident = self.stash_finder()
             self.latest_stash[0] = (self.unident, self.ident)
         else:
+            # Some more meat. Check for peices of a complete chaos set.
+            # first, if we don't have enough rings or one-handed weapons, just return false
             if len(self.latest_stash[0]["Rings"]) < 2 or len(self.latest_stash[0]['OneHandWeapons']) < 2:
                 return False
+            # If we do, continue to determine how many sets we can make
             else:
+                # Find the limiting two-slot item
                 two_slot_max_sets = min((floor(len(self.latest_stash[0]["Rings"]) / 2), floor(len(self.latest_stash[0]["OneHandWeapons"]) / 2)))
-                # print(two_slot_max_sets, 'tsms')
+                # Find limiting one-slot items
                 one_slot_max_sets = min([len(self.latest_stash[0][_key]) for _key in self.latest_stash[0].keys() if _key not in ["Rings", "OneHandWeapons"]])
-                # print(one_slot_max_sets, 'osms')
-                ## Do we 
+                # Find out if we are limited by two-slot, one-slot, or the user set maximum number of highlighted sets
                 max_sets = min((two_slot_max_sets, one_slot_max_sets, int(self.config['Config']['highlight_max_num_sets'])))
-                # print(244, max_sets)
+                # if we have 1 or more sets, create a dictionary of the items that make up the sets
+                # this only works for unidentified sets
+                # TODO: do same for identified items?
                 if max_sets:
-                    temp_unident = {_key:[] for _key in self.item_details.keys()}
-                    # temp_unident = self.latest_stash[0].copy()
+                    unident_sets = {_key:[] for _key in self.item_details.keys()}  # create a dictionary of empty lists to fill in and return
+                    # loop through each slot and find the maximum index in the list of coordinates for each item. We use this to only take the valid items.
                     for key in self.item_details.keys():
-                        # print(key)
-                        if key in ["Rings", "OneHandWeapons"]:
-                            _max_index = 2 * max_sets
+                        if DEBUG:
+                            pp.pprint(f"Item Slot name for item in {max_sets} complete sets:")
+                        if key in ["Rings", "OneHandWeapons"]:  # we need two of these, so the maximum index is twice that of the other items
+                            max_index = 2 * max_sets
                         else:
-                            _max_index = max_sets
-                        for i in range(_max_index):
-                            temp_unident[key].append(self.latest_stash[0][key][i])
-
-                    # self.unident = temp_unident
-                    #TODO: Update the identified stash more often also!
-                    # self.latest_stash[0] = temp_unident
-                    return temp_unident
+                            max_index = max_sets
+                        # Grab the items and their coordinates up the the maximum. These are dicts with the type of slot as the key, and a list of length-2 coordinates lists
+                        # I think we don't want to 'pop' the item from the list because the loop will then try to access indexes that are outside the list length
+                        for i in range(max_index):
+                            unident_sets[key].append(self.latest_stash[0][key][i].copy())
+                            if DEBUG:
+                                pp.pprint(f"Item of slot {key}, item number {i} passed to highlighting method self.chaos_recipe(): {unident_sets[key][-1]}")
+                    # Now remove these from the local inventory record. This could be more efficient by combining with the above, I am sure
+                    # TODO: This logic needs testing and scrutiny. I am not 100% sure it is doing what I think it is.
+                    for key in self.item_details.keys():
+                        indices_to_delete = []
+                        for i in range(len(self.latest_stash[key])):
+                            if self.latest_stash[key][i] in unident_sets[key]:
+                                indices_to_delete.append(i)
+                                continue
+                        # only keep the items that are not about to be highlighted
+                        self.latest_stash[key] = [_ for _ in self.latest_stash[key] if _ not in indices_to_delete]
+                    return unident_sets
                 else:
+                    # If we didn't have enough items for a complete set, return False
                     return False
-            # for key, value in self.unident.items():
-            #     if key != 'Rings' or key != 'OneHandWeapons':
-            #         print(key)
-            #         if len(value) < 1:
-            #             del self.unident
-            #             del self.ident
-            #             return False
-            #     else:
-            #         if len(value) < 2:
-            #             del self.unident
-            #             del self.ident
-            #             return False
-            # else:
-            #     return True
 
     def show_chaos(self):
+        """
+        This is all legacy. It creates and shows the overlay that has a running counter of items in each stash
+        I did not make changes other than to comment out the error being raised if the monitor was not 1920x1080
+        I honestly don't know what the buttons are even for, they never show up?
+        It uses this bizzare and obscure pygubu library.
+        It also relies on some html file that comes with this code (or ccs? idk some web language)
+        """
+        # TODO: make overly moveable again
         self.builder2 = pygubu.Builder()
         self.builder2.add_from_file('./buttons/Gui_Button_V1.ui')
         self.top3 = tk.Toplevel(self.mainwindow)
@@ -302,9 +319,11 @@ class MyApplication(pygubu.TkApplication):
         self.refresh_me()
 
     def close_overlay(self):
+        # more legacy for overlay
         self.top3.destroy()
 
     def refresh_me(self):
+        # more legacy.  for the running counter. I tried to incorporate the syncing parameter, but didn't try hard on this yet.
         unident, ident = self.stash_finder()
         for key, value in unident.items():
             alternative = len(ident.get(key, 0))
@@ -314,6 +333,11 @@ class MyApplication(pygubu.TkApplication):
             self.update_filter()
 
     def check_filter(self):
+        """
+        Legacy dynamic filter code. This doesn't work as far as I can tell. I am in the process of re-implementing this.
+        Right now all I can tell it is good for is setting the self.active_status parameter. Other methods looks for this.
+        This is called in the init method.
+        """
         rewrite = 0
         with open(self.config['Config']['filter'], 'r') as f:
             lines = f.readlines()
@@ -338,11 +362,16 @@ class MyApplication(pygubu.TkApplication):
                             }
 
     def stash_finder(self):
+        """
+        Legacy code. This works well enough.
+        Grabs the json object of the stash tab. Takes only the items, and grabs their stash position if they are unidentified.
+        """
         pos_last_unid = {'BodyArmours':[],  'Helmets':[],  'OneHandWeapons':[],  'Gloves':[],  'Boots':[],  'Amulets':[],  'Belts':[],  'Rings':[]}
         pos_last_id = {'BodyArmours':[],  'Helmets':[],  'OneHandWeapons':[],  'Gloves':[],  'Boots':[],  'Amulets':[],  'Belts':[],  'Rings':[]}
         stash_tab = f"https://www.pathofexile.com/character-window/get-stash-items?league={self.config['Config']['league']}&tabIndex={self.config['Config']['tab']}&accountName={self.config['Config']['account']}"
         a = requests.get(stash_tab, cookies=dict(POESESSID=(self.config['Config']['POESESSID'])))
-        self.last_update = datetime.datetime.now()
+        self.last_update = datetime.datetime.now()  #added by notaspook 14-9-2020
+        # I am not sure the logic here. It is able to find the item coordinates, but it looks like it does it twice. Didn't mess with it
         for x in json.loads(a.text)['items']:
             if x['name'] == '' and x['frameType'] != 3:
                 if 'BodyArmours' in x['icon']:
@@ -362,7 +391,7 @@ class MyApplication(pygubu.TkApplication):
                 elif 'Rings' in x['icon']:
                     pos_last_unid['Rings'].append([x['x'], x['y']])
             else:
-                if x['frameType'] == 3:
+                if x['frameType'] == 3:  # I dont know what this is fore
                     pass
                 else:
                     if 'BodyArmours' in x['icon']:
@@ -389,6 +418,8 @@ class MyApplication(pygubu.TkApplication):
                                                 if 'Rings' in x['icon']:
                                                     pos_last_id['Rings'].append([x['x'], x['y']])
         else:
+        ## I commented this out because I haven't gotten to the point of re-implementing the dynamic filter completely. Highlighting works without it.
+        ## I don't know why we needed a for-else here
         #     self.change_filtering = 0
         #     for key, value in pos_last_unid.items():
         #         if key not in self.config['Config']['ignore_threshold']:
@@ -405,46 +436,55 @@ class MyApplication(pygubu.TkApplication):
         #         if self.change_filtering == 1:
         #             self.filter_find()
                 # return (pos_last_unid, pos_last_id)
+            # return the remote stash tab snapshot
             return (pos_last_unid, pos_last_id)
 
-    def search(self, text):
-        pyautogui.click(x=ceil(self.screen_res[0] * .1), y=ceil(self.screen_res[1] * .5))
-        pyautogui.hotkey('ctrl', 'f')
-        pyautogui.typewrite(text)
-
+    # below is some half-implemented code for dynamically updating a main filter file. Idea is to be able to use your normal filter along with this helper. 
+    # I could use some help/optimization here. -notaspook 14-9-2020
     def read_default_chaos_filter_sections(self):
+        """
+        User can use the filter that comes with this program, or customize each slot to their liking.
+        Only important things are that each section starts with a '#' and has the correct item slot name in that line
+        Correct item slots are give in the self.item_details parameter. This should be the last word in the comment line.
+        """
         with open(self.config['Config']['default_filter'], 'r') as fil:
-            chaos_filter = fil.readlines()
-            section_lines_start_end = []
+            chaos_filter = fil.readlines()  # read whole file into memory. each line is stored as a string in a list
+            section_lines_start_end = []  # need a place to store where sections start and end
             section_starts = []
-            for i, line in enumerate(chaos_filter):
-                _line = line.lstrip()
-                # print(len(_line))
-                if len(_line) > 0 and _line[0] == "#":
-                    # print(_line)
+            for i, line in enumerate(chaos_filter):  # loop through the lines
+                _line = line.lstrip()  # remove any leading white space
+                # If the line is a comment, record that as the start of an item slot section
+                # We need to protect from empty lines which are stored as zero-length lists
+                if not _line and not _line[0] == "#":
+                    continue  
+                elif  _line and _line[0] == "#":  # I shouldn't need to, but I double check that the line is a comment anyway
                     section_starts.append(i)
-                    continue
-            #print(section_starts)
+            # each section ends where the next begins. The last section goes to the last line in the list, so concatenate that to the other ending indicies
             section_ends = [i for i in section_starts[1:]] + [len(chaos_filter)+1]
-            #print(section_ends)
+            # create empty dictionary for storing the text of each section
             sections = {}
+            # store the text for each section in the dictionary. The key for each section is the last word in the first line. This is maybe a dumb way of doing this and prone to user error.
+            # TODO: Find a better way to get the section keys
             for i, j in zip(section_starts, section_ends):
-                sections[chaos_filter[i].split(" ")[-1].rstrip()] = chaos_filter[i:j]
-            # print("\n")
-            # for s,v in sections.items():
-                # print(s)
-                # print(v)
-                # print('\n')
+                sections[chaos_filter[i].split(" ")[-1].rstrip()] = chaos_filter[i:j]  # for key, separate line into list of words, ensure whitespace is stripped. Text is from starting to ending indices
+            if DEBUG:
+                pp.pprint(sections)
         return sections
 
-
     def update_filter(self):
+        """
+        Attempt to update the main filter with showing/hiding recipe item slots that have reached the threshold.
+        It is inefficient, since it loops through a very large filter blade file, and re-writes text that should not change. 
+        I re-insert all the text from the default_filter just to be safe, but wouldn't need to if this is implemented in a better way.
+        This will not hide any items set to be ignored in the Setup.ini file.
+        """
         with open(self.config['Config']['filter'], 'r') as fil:
-            main_filter = fil.readlines()
-            sections_start_line = 0
+            main_filter = fil.readlines()  # read file into memory
+            sections_start_line = 0  # start a line counter to find the section in the filter where we should insert the dynamic text from the default_filter file (see read_default_chaos_filter_sections())
             sections_end_line = len(main_filter)
             for i, line in enumerate(fil.readlines()):
                 # I use a random string to find where the chaos recipe section begins and ends
+                # break after the end of the section has been found
                 if '234hn50987sd' in line:
                     sections_start_line = i + 1
                     continue
@@ -452,33 +492,41 @@ class MyApplication(pygubu.TkApplication):
                     sections_end_line = i
                     break
                 else:
+                    # If we cannot find the section. alert the user... with some vague, unhelpful instructions and return False. Didn't raise an error here, idk if I should
                     Msg.showinfo(title='POE QoL', message='Cannot find the chaos recipe section in your main filter.\n' + 
                                                           'It should start with "# 234hn50987sd End Chaos Recipe Auto-Update Section" and end in "# 2345ina8dsf7 End Chaos Recipe Auto-Update Section".\n'+
                                                           'Msg @notaspy#6561 for help. 14-09-2020 \n')
-                    # raise ValueError
                     return False
-            # take everything before and after the chaos recipe section
+            # take everything before and after the chaos recipe section from the original filter file. It shouldnt be changed
             main_filter0 = main_filter[0:sections_start_line]
             main_filter1 = main_filter[sections_end_line:]
-        sections_to_include = []
+        # go through the item slots and their meta-data (which has the threshold for items set by user)
         for slot, details in self.item_details.items():
             try:
-                print("\n456 LATEST STASH", self.latest_stash)
-                print("\n457 LATEST STASH", slot, details)
                 if len(self.latest_stash[0][slot]) < details[4]:  # if the number of items is greater than the threshold, keep it in the filter
-                    self.default_filter_sections[slot][1] = "Show\n"
+                    self.default_filter_sections[slot][1] = "Show\n" # The show/hide flag is the second entry in the filter section text (see default_filter in Setup.ini)
                 else:
                     self.default_filter_sections[slot][1] = "Hide\n"
-            except (AttributeError, ValueError):
-                Msg.showinfo(title='POE QoL', message='Check default filter formatting. Msg @notaspy#6561 for help. 14-09-2020')
+            except (AttributeError, ValueError):  # Try to catch some errors. Not sure if this will work, don't have time to test the string formatting and message box
+                # TODO: Test this error message
+                Msg.showinfo(title='POE QoL', message=f'Check default filter formatting. There should be a valid entry for each item slot. The last word in each line should be one of the following: {[str(_[0]) for _ in self.item_details]}')
+        # flatten the list of lists for the lines that should be added to the filter file
         new_filter_lines = [l for slt in self.default_filter_sections.values() for l in slt]
-        print('\n', 464, new_filter_lines)
+        if DEBUG:
+            pp.pprint(f"Text to be inserted into the user's main filter file between lines {sections_start_line} and {sections_end_line}")
+            pp.pprint(new_filter_lines)
         new_main_filter = main_filter0 + new_filter_lines + main_filter1
+        # TODO:enable the writing after testing
         # with open(self.config['Config']['filter'], 'w') as fil:
         #     fil.write(new_main_filter)
         return True
 
     #Below are just methods that will search the stash tab for common things. didn't mess with these -notaspy 14-9-2020
+    def search(self, text):
+        pyautogui.click(x=ceil(self.screen_res[0] * .1), y=ceil(self.screen_res[1] * .5))
+        pyautogui.hotkey('ctrl', 'f')
+        pyautogui.typewrite(text)
+
     def currency(self):
         self.search('"currency"')
 
@@ -525,6 +573,7 @@ class MyApplication(pygubu.TkApplication):
         self.search('"unid"')
 
 if __name__ == '__main__':
+    # legacy. Run the applet.
     root = tk.Tk()
     root.title('Path of Exile - Quality of Life (POE-QOL)')
     app = MyApplication(root)
