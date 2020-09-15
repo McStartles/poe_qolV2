@@ -136,9 +136,9 @@ class MyApplication(pygubu.TkApplication):
         #TODO: Use data about identified items
         self.unident, self.ident = self.stash_finder()
         # Since the app has asynchronous knowledge of the items in tab, we want to have some local record. We'll call that latest_stash and allow it to be changed.
-        # ~~~IMPORTANT~~~~: The remote snapshot and the local record are two separate dict parameters and a tuple of dicts. I need to change this for consistency
-        # TODO: refactor remote snapshot and local record to be either both tuples or both separate dicts for unidentified and identified items
-        self.latest_stash = (self.unident.copy(), self.ident.copy())
+        # ~~~IMPORTANT~~~~: The remote snapshot and the local record are two separate dict parameters and a length-2 list of dicts. I need to change this for consistency
+        # TODO: refactor remote snapshot and local record to be either both lists or both separate dicts for unidentified and identified items
+        self.latest_stash = list((self.unident.copy(), self.ident.copy()))
         # initial dynamic filter update
         self.update_filter()
         # check if the local and remote inventories are synchronized. Uses the refresh rate (in seconds) set in the Setup.ini file.
@@ -152,9 +152,18 @@ class MyApplication(pygubu.TkApplication):
         """Run the main loop. Self explanatory."""
         self.mainwindow.mainloop()
 
+    def remove_highlights(self):
+        if self.highlighted_items:
+            for highlight in self.highlighted_items:
+                highlight.destroy()
+            return True
+        else:
+            return False
+
     def chaos_recipe(self):
         """
         The meat of the program. Based on the number of complete sets, create top-level geometries that highlight areas of the screens for each item in the set.
+        TODO: Make it so that the item is removed from local inventor ONLY if the user clicks on the highlight box. I am sure someone will click it without actually removing the item and it will not be recognize and user will complain.
         """
         # get a dictionary of the LOCAL complete sets items. 
         # this will be sync'd with the online stash if this is the first time this method has been called since last remote refresh
@@ -172,14 +181,12 @@ class MyApplication(pygubu.TkApplication):
             # if any previous highlights still exist, destroy them. 
             # If we don't do this, the way it is written below, if user doesn't manually click each highlight, they become non-interactive.
             # So, just killing everything is the fast and dirty way I decided wipe the screen clear if needed.
-            if self.highlighted_items:
-                for highlight in self.highlighted_items:
-                    highlight.destroy()
+            self.remove_highlights()
             # loop through each item slot (key)
             for x in unident:
                 if DEBUG:
-                    pp.pprint('Item Slot:', x)
-                    pp.pprint('Item coordinates', unident[x])
+                    pp.pprint(('Item Slot:', x))
+                    pp.pprint(('Item coordinates', unident[x]))
                 # we will count from the top-left origin
                 x_off = self.tab_origin[0]
                 y_off = self.tab_origin[1]
@@ -192,11 +199,11 @@ class MyApplication(pygubu.TkApplication):
                     cord_x = cord_x * self.box_width + x_off  # convert coordinates to pixels
                     cord_y = cord_y * self.box_height + y_off
                     if DEBUG:
-                        pp.pprint('Screen Coordinates:',(cord_x, cord_y))
+                        pp.pprint(('Screen Coordinates:',(cord_x, cord_y)))
                     box_width = self.box_width * self.item_details[x][0]  # based on the meta-data about item size in self.item_details, make appropriate size box
                     box_height = self.box_height * self.item_details[x][1]
                     if DEBUG:       
-                        pp.pprint('Box dimensions (pixels):',(box_width, box_height))
+                        pp.pprint(('Box dimensions (pixels):',(box_width, box_height)))
                     # below is legacy
                     # basically it creates a semi-transparent top level window that disappears when it is clicked. I decided to use different colors by item slot
                     exec(f"self.{x + str(i)} = tk.Toplevel(self.mainwindow)")
@@ -218,9 +225,10 @@ class MyApplication(pygubu.TkApplication):
         Sets and returns a bool. I made this. -notaspook 14-9-2020
         """
         t_check = datetime.datetime.now()  # get current time
+        t_previous_check = self.last_update  # we need to have this here since it is reset by the next call to self.stash_finder()
         # compare local and remote stash inventories. short circuits if the refresh time has not elapsed
         remote_inventory_unident, remote_inventory_ident = self.stash_finder()
-        if (t_check - self.last_update) < datetime.timedelta(seconds=float(self.config['Config']['refresh_time'])) and remote_inventory_unident == self.unident:
+        if (t_check - t_previous_check) < datetime.timedelta(seconds=float(self.config['Config']['refresh_time'])) and remote_inventory_unident == self.unident:
             self.synced = True
         else:
             self.synced = False
@@ -268,7 +276,7 @@ class MyApplication(pygubu.TkApplication):
                     # loop through each slot and find the maximum index in the list of coordinates for each item. We use this to only take the valid items.
                     for key in self.item_details.keys():
                         if DEBUG:
-                            pp.pprint(f"Item Slot name for item in {max_sets} complete sets:")
+                            pp.pprint(f"Item Slot name for item in {max_sets} complete sets: {key}")
                         if key in ["Rings", "OneHandWeapons"]:  # we need two of these, so the maximum index is twice that of the other items
                             max_index = 2 * max_sets
                         else:
@@ -283,12 +291,14 @@ class MyApplication(pygubu.TkApplication):
                     # TODO: This logic needs testing and scrutiny. I am not 100% sure it is doing what I think it is.
                     for key in self.item_details.keys():
                         indices_to_delete = []
-                        for i in range(len(self.latest_stash[key])):
-                            if self.latest_stash[key][i] in unident_sets[key]:
+                        if DEBUG:
+                            pp.pprint((f"self.latest_stash entry of {key}:", self.latest_stash[0][key]))
+                        for i in range(len(self.latest_stash[0][key])):
+                            if self.latest_stash[0][key][i] in unident_sets[key]:
                                 indices_to_delete.append(i)
                                 continue
                         # only keep the items that are not about to be highlighted
-                        self.latest_stash[key] = [_ for _ in self.latest_stash[key] if _ not in indices_to_delete]
+                        self.latest_stash[0][key] = [_ for j, _ in enumerate(self.latest_stash[0][key]) if j not in indices_to_delete]
                     return unident_sets
                 else:
                     # If we didn't have enough items for a complete set, return False
@@ -455,7 +465,12 @@ class MyApplication(pygubu.TkApplication):
                 _line = line.lstrip()  # remove any leading white space
                 # If the line is a comment, record that as the start of an item slot section
                 # We need to protect from empty lines which are stored as zero-length lists
-                if not _line and not _line[0] == "#":
+                if DEBUG:
+                    pp.pprint(("Default Filter Line as read:", _line))
+                    pp.pprint(("Result of bool test for empty line:", not _line))
+                    if _line:
+                        pp.pprint(("Result of bool test for comment:", not _line[0] == "#"))
+                if not _line or not _line[0] == "#":
                     continue  
                 elif  _line and _line[0] == "#":  # I shouldn't need to, but I double check that the line is a comment anyway
                     section_starts.append(i)

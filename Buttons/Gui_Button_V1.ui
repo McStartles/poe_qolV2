@@ -189,8 +189,8 @@
       </object>
     </child>
     <child>
-      <object id="chaos_recipe" class="ttk.Button">
-        <property name="command">chaos_recipe</property>
+      <object id="remove_highlights" class="ttk.Button">
+        <property name="command">remove_highlights</property>
         <property name="text" translatable="yes">Remove Highlights</property>
         <layout>
           <property name="column">1</property>
