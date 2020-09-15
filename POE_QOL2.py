@@ -14,8 +14,9 @@ import win32con, win32gui
 from tkinter import font
 import datetime
 
-DEBUG=True
+DEBUG=False
 if DEBUG:
+    #TODO: Output to a log file instead of terminal
     import pprint
     pp = pprint.PrettyPrinter(indent=4)
 
@@ -80,7 +81,11 @@ class MyApplication(pygubu.TkApplication):
         self.mainwindow = builder.get_object('Frame_1', self.master)
         self.font = font.Font(self.master, family="Times", size=20, weight="bold")
         builder.connect_callbacks(self)
-        self.check_filter()  # This is legacy, to set the 
+
+        # TODO: Create a method that reloads the Setup.ini file before executing certain methods so it can be updated on the fly
+        # TODO: Validate the Setup.ini file contents and formatting and instruct user how to fix it if necessary
+        # TODO: Validate the default_filter.filter file contents and formatting and instruct user how to fix it if necessary
+        # self.check_filter()  # This is legacy, to set the self.active_status parameter. I don't think that is needed anymore.
         #Note to self,  from trying a bunch of different resolutions and 3 monitors i found that,
         # stash/inv tabs had a fixed width to height ratio of 886/1440 (~0.6153)that must be obeyed.
         self.screen_res = [int(dim) for dim in self.config['Config']['screen_res'].split('x')]
@@ -364,7 +369,7 @@ class MyApplication(pygubu.TkApplication):
                 rewrite = 1
         if rewrite == 1:
             with open(self.config['Config']['filter'], 'w') as f:
-                filterfile = open('filter')
+                filterfile = open(self.config['Config']['filter'])
                 f.write(filterfile.read())
                 filterfile.close()
                 for line in lines:
@@ -384,6 +389,7 @@ class MyApplication(pygubu.TkApplication):
         """
         Legacy code. This works well enough.
         Grabs the json object of the stash tab. Takes only the items, and grabs their stash position if they are unidentified.
+        TODO: Right now, the items are disordered. They should be ordered to register from top-left to bottom right for efficiency
         """
         pos_last_unid = {'BodyArmours':[],  'Helmets':[],  'OneHandWeapons':[],  'Gloves':[],  'Boots':[],  'Amulets':[],  'Belts':[],  'Rings':[]}
         pos_last_id = {'BodyArmours':[],  'Helmets':[],  'OneHandWeapons':[],  'Gloves':[],  'Boots':[],  'Amulets':[],  'Belts':[],  'Rings':[]}
@@ -541,8 +547,9 @@ class MyApplication(pygubu.TkApplication):
             pp.pprint(new_filter_lines)
         new_main_filter = main_filter0 + new_filter_lines + main_filter1
         # TODO:enable the writing after testing
-        # with open(self.config['Config']['filter'], 'w') as fil:
-        #     fil.write(new_main_filter)
+        with open(self.config['Config']['filter'], 'w') as fil:
+            for line in new_main_filter:
+                fil.write(line)
         return True
 
     #Below are just methods that will search the stash tab for common things. didn't mess with these -notaspy 14-9-2020
