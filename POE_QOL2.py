@@ -14,7 +14,7 @@ import win32con, win32gui
 from tkinter import font
 import datetime
 
-DEBUG=True
+DEBUG=False
 if DEBUG:
     #TODO: Output to a log file instead of terminal
     import pprint
