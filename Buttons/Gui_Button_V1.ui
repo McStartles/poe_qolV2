@@ -182,9 +182,21 @@
         <property name="text" translatable="yes">unid</property>
         <layout>
           <property name="column">0</property>
-          <property name="columnspan">2</property>
+          <property name="columnspan">1</property>
           <property name="propagate">True</property>
-          <property name="row">1</property>
+          <property name="row">2</property>
+        </layout>
+      </object>
+    </child>
+    <child>
+      <object id="chaos_recipe" class="ttk.Button">
+        <property name="command">chaos_recipe</property>
+        <property name="text" translatable="yes">Remove Highlights</property>
+        <layout>
+          <property name="column">1</property>
+          <property name="columnspan">3</property>
+          <property name="propagate">True</property>
+          <property name="row">2</property>
         </layout>
       </object>
     </child>
@@ -193,20 +205,8 @@
         <property name="command">chaos_recipe</property>
         <property name="text" translatable="yes">Chaos Recipe</property>
         <layout>
-          <property name="column">2</property>
-          <property name="columnspan">2</property>
-          <property name="propagate">True</property>
-          <property name="row">2</property>
-        </layout>
-      </object>
-    </child>
-    <child>
-      <object id="remove_highlights" class="ttk.Button">
-        <property name="command">chaos_recipe</property>
-        <property name="text" translatable="yes">Remove Highlights</property>
-        <layout>
-          <property name="column">4</property>
-          <property name="columnspan">2</property>
+          <property name="column">3</property>
+          <property name="columnspan">3</property>
           <property name="propagate">True</property>
           <property name="row">2</property>
         </layout>
@@ -217,10 +217,10 @@
         <property name="command">show_chaos</property>
         <property name="text" translatable="yes">Overlay</property>
         <layout>
-          <property name="column">5</property>
-          <property name="columnspan">2</property>
+          <property name="column">6</property>
+          <property name="columnspan">1</property>
           <property name="propagate">True</property>
-          <property name="row">1</property>
+          <property name="row">2</property>
         </layout>
       </object>
     </child>
