@@ -174,12 +174,19 @@ class MyApplication(pygubu.TkApplication):
                 self.latest_stash = list((self.unident.copy(), self.ident.copy()))
             return True
         else:
+            # in testing, i found an edge case where if all the items were cycled through, and the local inventory was scanned again, it would only show the first sets. 
+            # Using the Remove Highlights button to force re-syncing until bug is found
+            # TODO: HIGH Priority: figure out why sometimes the same initial areas are highlighted
+            if update_local_record:  # update the snapshot and local record if requested
+                self.unident, self.ident = self.stash_finder()
+                self.latest_stash = list((self.unident.copy(), self.ident.copy()))
             return False
 
     def chaos_recipe(self):
         """
         The meat of the program. Based on the number of complete sets, create top-level geometries that highlight areas of the screens for each item in the set.
         TODO: Make it so that the item is removed from local inventor ONLY if the user clicks on the highlight box. I am sure someone will click it without actually removing the item and it will not be recognize and user will complain.
+        # TODO: HIGH Priority: figure out why sometimes the same initial areas are highlighted        
         """
         # get a dictionary of the LOCAL complete sets items. 
         # this will be sync'd with the online stash if this is the first time this method has been called since last remote refresh
