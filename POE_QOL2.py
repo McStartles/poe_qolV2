@@ -152,10 +152,19 @@ class MyApplication(pygubu.TkApplication):
         """Run the main loop. Self explanatory."""
         self.mainwindow.mainloop()
 
-    def remove_highlights(self):
-        if self.highlighted_items:
-            for highlight in self.highlighted_items:
+    def remove_highlights(self, update_local_record=True):
+        """
+        In case the user wants to manually remove the highlights on screen. By default it resets to local record to be synced with the remote snapshot.
+        We assume the user did not click on items if they removed all the highlights.
+        This is prone to errors if a user clicks on some, but not all of the highlights and then clicks this button.
+        TODO: handle half-removed highlights in combination with this method.
+        """
+        if self.highlighted_items:  # test that highlight actually exist that need deletion
+            for highlight in self.highlighted_items:  # delete them
                 highlight.destroy()
+            if update_local_record:  # update the snapshot and local record if requested
+                self.unident, self.ident = self.stash_finder()
+                self.latest_stash = list((self.unident.copy(), self.ident.copy()))
             return True
         else:
             return False
@@ -181,7 +190,7 @@ class MyApplication(pygubu.TkApplication):
             # if any previous highlights still exist, destroy them. 
             # If we don't do this, the way it is written below, if user doesn't manually click each highlight, they become non-interactive.
             # So, just killing everything is the fast and dirty way I decided wipe the screen clear if needed.
-            self.remove_highlights()
+            self.remove_highlights(update_local_record=False)
             # loop through each item slot (key)
             for x in unident:
                 if DEBUG:
