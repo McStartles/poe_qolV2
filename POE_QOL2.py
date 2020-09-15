@@ -117,6 +117,7 @@ class MyApplication(pygubu.TkApplication):
         # order user should add item to inventory to avoid inventory tetris fail situations,
         # threshold of how many items before dynamic filter editor starts to hide this item slot
         #]
+        # TODO: We can get the sizes of the items directly from the site, rather than hard coding them as below
         self.item_details = dict(
             Rings=[1, 1, 'green2', '4', int(self.config['Config']['threshold'])*2],
             OneHandWeapons=[1, 3, 'snow', '1', int(self.config['Config']['threshold']*2)],
@@ -174,25 +175,28 @@ class MyApplication(pygubu.TkApplication):
                 self.latest_stash = list((self.unident.copy(), self.ident.copy()))
             return True
         else:
-            # in testing, i found an edge case where if all the items were cycled through, and the local inventory was scanned again, it would only show the first sets. 
-            # Using the Remove Highlights button to force re-syncing until bug is found
-            # TODO: HIGH Priority: figure out why sometimes the same initial areas are highlighted
-            if update_local_record:  # update the snapshot and local record if requested
-                self.unident, self.ident = self.stash_finder()
-                self.latest_stash = list((self.unident.copy(), self.ident.copy()))
             return False
 
     def chaos_recipe(self):
         """
         The meat of the program. Based on the number of complete sets, create top-level geometries that highlight areas of the screens for each item in the set.
         TODO: Make it so that the item is removed from local inventor ONLY if the user clicks on the highlight box. I am sure someone will click it without actually removing the item and it will not be recognize and user will complain.
-        # TODO: HIGH Priority: figure out why sometimes the same initial areas are highlighted        
+        # TODO: HIGH Priority: figure out why sometimes the same initial areas are highlighted. I may have fixed this by checking the inventory sync (and for left over highlights) first thing
         """
+        # if any previous highlights still exist, destroy them. 
+        # If we don't do this, the way it is written below, if user doesn't manually click each highlight, they become non-interactive.
+        # So, just killing everything is the fast and dirty way I decided wipe the screen clear if needed.
+        if self.check_inventory_sync():
+            self.remove_highlights(update_local_record=False)
+        else:
+            self.remove_highlights(update_local_record=True)
+
         # get a dictionary of the LOCAL complete sets items. 
         # this will be sync'd with the online stash if this is the first time this method has been called since last remote refresh
         # If user has clicked on a highlighted item, it gets removed locally, but the remote won't know that for a little.    
         # Dict keys are the slot name and values are the normalized positions.
         # the positions are lists of length-2 lists:eg [[x0, y0], [x1, y1]]
+
         unident = self.check_complete_set()
 
         # unident will be an empty dict if there's no complete sets left, and will inform user
@@ -201,10 +205,7 @@ class MyApplication(pygubu.TkApplication):
             Msg.showinfo(title='POE QoL', message='Not enough Chaos Recipe Items')
         # if we have sets, go into the highlighting logic
         else:
-            # if any previous highlights still exist, destroy them. 
-            # If we don't do this, the way it is written below, if user doesn't manually click each highlight, they become non-interactive.
-            # So, just killing everything is the fast and dirty way I decided wipe the screen clear if needed.
-            self.remove_highlights(update_local_record=False)
+
             # loop through each item slot (key)
             for x in unident:
                 if DEBUG:
@@ -271,7 +272,7 @@ class MyApplication(pygubu.TkApplication):
             if DEBUG:
                 pp.pprint(self.unident)
         # legacy test for existance of the attributes. kinda tried to refactor it. Functional but not pretty. 
-        # Notice the different syntax for the remote snapshot and the local record (ie local is a tuple of dicts)
+        # Notice the different syntax for the remote snapshot and the local record (ie local is a list of dicts)
         try:
             self.unident
             self.latest_stash[0]
