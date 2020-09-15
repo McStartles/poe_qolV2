@@ -14,12 +14,18 @@ import win32con, win32gui
 from tkinter import font
 import datetime
 
+DEBUG=True
+if DEBUG:
+    import pprint
+    pp = pprint.PrettyPrinter(indent=4)
+
 def click_item(a, b, c):
     """
     Used for when the user clicks on the highlight. Destroys the highlight and passes through the click action.
     Wish I knew how to make it 'click-through able'
     """
-    exec(f"app.{a}.destroy()")
+    a.destroy()
+    # exec(f"app.{a}.destroy()")  #legacy -notaspook 14-9-2020
     x, y = pyautogui.position()
     pyautogui.click(x=x, y=y)  
 
@@ -126,9 +132,10 @@ class MyApplication(pygubu.TkApplication):
 
         # This is legacy, but works okay, so left it. stash_finder returns a dict of item slots and thier coordinates in the stash for unid'd and id'd items.
         # id'd items are basically ignored in this code, so not sure why they are tracked. Could be useful in future iterations.
+        # self.unident and self.ident represent the remote inventory last time it was checked. These values should not be changed other than when the remote has changed.
         #TODO: Use data about identified items
         self.unident, self.ident = self.stash_finder()
-        # Since the app has asynchronous knowledge of the items in tab, we want to have some local record. We'll call that latest_stash
+        # Since the app has asynchronous knowledge of the items in tab, we want to have some local record. We'll call that latest_stash and allow it to be changed.
         self.latest_stash = (self.unident.copy(), self.ident.copy())
         # initial dynamic filter update
         self.update_filter()
@@ -168,62 +175,62 @@ class MyApplication(pygubu.TkApplication):
                     highlight.destroy()
             # loop through each item slot (key)
             for x in unident:
+                if DEBUG:
+                    pp.pprint('Item Slot:', x)
+                    pp.pprint('Item coordinates', unident[x])
                 # we will count from the top-left origin
                 x_off = self.tab_origin[0]
                 y_off = self.tab_origin[1]
                 # cord_x, cord_y = self.unident[x].pop(0)  # Leaving this here so you can see the previous method was to pop items from the list. It was problematic. -notaspy 14-9-2020
-                for i in range(len(unident[x]))
-                    cord_x, cord_y = unident[x][0]
-                    print(cord_y, self.box_height)
-                    cord_x = cord_x * self.box_width + x_off
+                for i in range(len(unident[x])):
+                    # reimplemented this as a loop over the items that make up the number of complete sets
+                    # The execs are legacy. I don't like them, and could probably re-do it, but won't atm
+                    #TODO: refactor exec usage
+                    cord_x, cord_y = unident[x][i]  # get coordinates of entry
+                    cord_x = cord_x * self.box_width + x_off  # convert coordinates to pixels
                     cord_y = cord_y * self.box_height + y_off
-                    box_width = self.box_width * self.item_details[x][0]
+                    if DEBUG:
+                        pp.pprint('Screen Coordinates:',(cord_x, cord_y))
+                    box_width = self.box_width * self.item_details[x][0]  # based on the meta-data about item size in self.item_details, make appropriate size box
                     box_height = self.box_height * self.item_details[x][1]
-                    exec(f"self.{x} = tk.Toplevel(self.mainwindow)")
-                    exec(f'self.{x}.attributes("-alpha", 0.65)')
-                    exec(f'self.{x}.config(background="{self.item_details[x][2]}")')
-                    exec(f"self.{x}.overrideredirect(1)")
-                    exec(f'self.{x}.attributes("-topmost", 1)')
-                    exec(f'self.{x}.geometry("{ceil(box_width)}x{ceil(box_height)}+{ceil(cord_x)}+{ceil(cord_y)}")')
-                    exec(f'self.{x}.bind("<Button-1>",lambda command, a=x,b=cord_x,c=cord_y: click_item(a,b,c))')
-                    exec(f'self.highlighted_items.append(self.{x})')
-
-
-                    if x not in ["Rings", "OneHandWeapons"]:
-                            continue
-                    # cord_x, cord_y = self.unident[x].pop(0)
-                    # cord_x, cord_y = unident.pop(0)
-                    print('199', unident)
-                    cord_x, cord_y = unident[x][1]
-                    cord_x = cord_x * self.box_width + x_off
-                    cord_y = cord_y * self.box_height + y_off
-                    x2 = x + '2'
-                    exec(f"self.{x2} = tk.Toplevel(self.mainwindow)")
-                    exec(f"self.{x2}.attributes('-alpha', 0.65)")
-                    exec(f'self.{x2}.config(background="{self.item_details[x][2]}")')
-                    exec(f"self.{x2}.overrideredirect(1)")
-                    exec(f"self.{x2}.attributes('-topmost', 1)")
-                    exec(f"self.{x2}.geometry('{ceil(box_width)}x{ceil(box_height)}+{ceil(cord_x)}+{ceil(cord_y)}')")
-                    exec(f"self.{x2}.bind('<Button-1>',lambda event, a=x2,b=cord_x,c=cord_y: click_item(a,b,c))")
-                    exec(f'self.highlighted_items.append(self.{x2})')
+                    if DEBUG:       
+                        pp.pprint('Box dimensions (pixels):',(box_width, box_height))
+                    # below is legacy
+                    # basically it creates a semi-transparent top level window that disappears when it is clicked. I decided to use different colors by item slot
+                    exec(f"self.{x + str(i)} = tk.Toplevel(self.mainwindow)")
+                    exec(f'self.{x + str(i)}.attributes("-alpha", 0.65)')
+                    exec(f'self.{x + str(i)}.config(background="{self.item_details[x][2]}")')
+                    exec(f"self.{x + str(i)}.overrideredirect(1)")
+                    exec(f'self.{x + str(i)}.attributes("-topmost", 1)')
+                    exec(f'self.{x + str(i)}.geometry("{ceil(box_width)}x{ceil(box_height)}+{ceil(cord_x)}+{ceil(cord_y)}")')
+                    exec(f'self.box = self.{x + str(i)}')
+                    # was able to get rid of the legacy exec call below. Using the actual object fixes errors in destroying the highlight if highlighting over and over
+                    # exec(f'self.{x + str(i)}.bind("<Button-1>",lambda command, a=x,b=cord_x,c=cord_y: click_item(a,b,c))')  #legacy -notaspook 14-9-2020
+                    self.box.bind("<Button-1>",lambda command, a=self.box,b=cord_x,c=cord_y: click_item(a,b,c))  #bind click command to object
+                    # make sure the highlight objects persist so they are all interactive and can be deleted when method is run (see above, before loops)
+                    self.highlighted_items.append(self.box)
 
     def check_inventory_sync(self):
-        t_check = datetime.datetime.now()
-        # if self.latest_stash[0] == self.unident or (t_check - self.last_update) < datetime.timedelta(seconds=float(self.config['Config']['refresh_time'])):
-        if self.latest_stash[0] == self.unident and (t_check - self.last_update) < datetime.timedelta(seconds=float(self.config['Config']['refresh_time'])):
+        """
+        This is kinda useful. Checks if the local and remote stashes are the same OR if the user-give refresh interval has elapsed.
+        Sets and returns a bool. I made this. -notaspook 14-9-2020
+        """
+        t_check = datetime.datetime.now()  # get current time
+        # compare local and remote stash inventories. short circuits if the refresh time has not elapsed
+        if (t_check - self.last_update) < datetime.timedelta(seconds=float(self.config['Config']['refresh_time'])) and self.latest_stash[0] == self.unident:
             self.synced = True
-            for a in self.item_details.keys():
-                try:
-                    exec(f"app.{a}.destroy()")
-                    exec(f"app.{a+'2'}.destroy()")
-                except:
-                    pass
         else:
             self.synced = False
-        print(f"218 Synced?: {self.synced}")
+        if DEBUG:
+            pp.pprint(f"Synced?: {self.synced}")
         return self.synced
 
     def check_complete_set(self):
+        """
+        This is kind-of a Frakenstein code between legacy and my own.
+        I did my best to re-implement the logic to handle the local/remote problem. -notaspy 14-9-2020
+        """
+        # If the local inventory and the last snapshot are not sync'd, update the snap shot and the 
         if not self.check_inventory_sync():
             self.unident, self.ident = self.stash_finder()
             print(224, self.unident, self.ident)
