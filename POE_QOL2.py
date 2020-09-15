@@ -14,7 +14,7 @@ import win32con, win32gui
 from tkinter import font
 import datetime
 
-DEBUG=False
+DEBUG=True
 if DEBUG:
     #TODO: Output to a log file instead of terminal
     import pprint
@@ -85,6 +85,7 @@ class MyApplication(pygubu.TkApplication):
         # TODO: Create a method that reloads the Setup.ini file before executing certain methods so it can be updated on the fly
         # TODO: Validate the Setup.ini file contents and formatting and instruct user how to fix it if necessary
         # TODO: Validate the default_filter.filter file contents and formatting and instruct user how to fix it if necessary
+        # TODO: Restore the original main filter file one exit. I really am bad at handling exit callbacks
         # self.check_filter()  # This is legacy, to set the self.active_status parameter. I don't think that is needed anymore.
         #Note to self,  from trying a bunch of different resolutions and 3 monitors i found that,
         # stash/inv tabs had a fixed width to height ratio of 886/1440 (~0.6153)that must be obeyed.
@@ -333,6 +334,11 @@ class MyApplication(pygubu.TkApplication):
         self.frame3 = self.builder2.get_object('Frame_2', self.top3)
         self.builder2.connect_callbacks(self)
         self.top3.overrideredirect(1)
+        # I went ahead and put this at bottom center
+        overlay_location = f'+{self.screen_res[0] // 2 - 130}+{floor(self.screen_res[1] * (1 - 80/1080))}'
+        self.top3.geometry(overlay_location)
+        if DEBUG:
+            pp.pprint(f'Overlay Location:{overlay_location}')
         # if self.config['Config']['screen_res'] == '1920x1018':
         #     self.top3.geometry('+1180+900')
         # elif self.config['Config']['screen_res'] == '1920x1080':
@@ -512,21 +518,32 @@ class MyApplication(pygubu.TkApplication):
             main_filter = fil.readlines()  # read file into memory
             sections_start_line = 0  # start a line counter to find the section in the filter where we should insert the dynamic text from the default_filter file (see read_default_chaos_filter_sections())
             sections_end_line = len(main_filter)
-            for i, line in enumerate(fil.readlines()):
+            if DEBUG:
+                pp.pprint(self.config['Config']['filter'])
+                pp.pprint(f"Main filter start line:{sections_start_line}")
+                pp.pprint(f"Main filter end line:{sections_end_line}")
+            for i, line in enumerate(main_filter):
                 # I use a random string to find where the chaos recipe section begins and ends
                 # break after the end of the section has been found
                 if '234hn50987sd' in line:
                     sections_start_line = i + 1
+                    if DEBUG:
+                        pp.pprint(f"Start of chaos recipe section found at line {sections_start_line}")
                     continue
                 elif '2345ina8dsf7' in line:
                     sections_end_line = i
+                    if DEBUG:
+                        pp.pprint(f"End of chaos recipe section found at line {sections_end_line}")
                     break
-                else:
-                    # If we cannot find the section. alert the user... with some vague, unhelpful instructions and return False. Didn't raise an error here, idk if I should
-                    Msg.showinfo(title='POE QoL', message='Cannot find the chaos recipe section in your main filter.\n' + 
-                                                          'It should start with "# 234hn50987sd End Chaos Recipe Auto-Update Section" and end in "# 2345ina8dsf7 End Chaos Recipe Auto-Update Section".\n'+
-                                                          'Msg @notaspy#6561 for help. 14-09-2020 \n')
-                    return False
+                #TODO: This else clause should be implemented, but doesn't work right now
+                # else:
+                #     # If we cannot find the section. alert the user... with some vague, unhelpful instructions and return False. Didn't raise an error here, idk if I should
+                #     Msg.showinfo(title='POE QoL', message='Cannot find the chaos recipe section in your main filter.\n' + 
+                #                                           'It should start with "# 234hn50987sd End Chaos Recipe Auto-Update Section" and end in "# 2345ina8dsf7 End Chaos Recipe Auto-Update Section".\n'+
+                #                                           'Msg @notaspy#6561 for help. 14-09-2020 \n')
+                #     return False
+                    if DEBUG:
+                        pp.pprint("The entire filter file was looped through. This should not happen.")
             # take everything before and after the chaos recipe section from the original filter file. It shouldnt be changed
             main_filter0 = main_filter[0:sections_start_line]
             main_filter1 = main_filter[sections_end_line:]
@@ -535,8 +552,12 @@ class MyApplication(pygubu.TkApplication):
             try:
                 if len(self.latest_stash[0][slot]) < details[4]:  # if the number of items is greater than the threshold, keep it in the filter
                     self.default_filter_sections[slot][1] = "Show\n" # The show/hide flag is the second entry in the filter section text (see default_filter in Setup.ini)
+                    if DEBUG:
+                        pp.pprint(f"The filter will now show items of {slot} slot.")
                 else:
                     self.default_filter_sections[slot][1] = "Hide\n"
+                    if DEBUG:
+                        pp.pprint(f"The filter will now hide items of {slot} slot.")
             except (AttributeError, ValueError):  # Try to catch some errors. Not sure if this will work, don't have time to test the string formatting and message box
                 # TODO: Test this error message
                 Msg.showinfo(title='POE QoL', message=f'Check default filter formatting. There should be a valid entry for each item slot. The last word in each line should be one of the following: {[str(_[0]) for _ in self.item_details]}')
@@ -546,6 +567,8 @@ class MyApplication(pygubu.TkApplication):
             pp.pprint(f"Text to be inserted into the user's main filter file between lines {sections_start_line} and {sections_end_line}")
             pp.pprint(new_filter_lines)
         new_main_filter = main_filter0 + new_filter_lines + main_filter1
+        if DEBUG:
+            pp.pprint((len(main_filter0), len(main_filter1), len(new_filter_lines)))
         # TODO:enable the writing after testing
         with open(self.config['Config']['filter'], 'w') as fil:
             for line in new_main_filter:
@@ -609,3 +632,4 @@ if __name__ == '__main__':
     root.title('Path of Exile - Quality of Life (POE-QOL)')
     app = MyApplication(root)
     app.run()
+
