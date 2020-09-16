@@ -1,7 +1,3 @@
-# decompyle3 version 3.3.2
-# Python bytecode 3.8 (3413)
-# Decompiled from: Python 3.8.5 (default, Sep  3 2020, 21:29:08) [MSC v.1916 64 bit (AMD64)]
-# Embedded file name: POE_QOL.py
 import tkinter as tk
 import tkinter.messagebox as Msg
 import pygubu, pyautogui
@@ -17,6 +13,8 @@ import datetime
 DEBUG=False
 if DEBUG:
     #TODO: Output to a log file instead of terminal
+    import sys
+    sys.stdout = open('logfile.txt', 'w')
     import pprint
     pp = pprint.PrettyPrinter(indent=4)
 
@@ -31,38 +29,38 @@ def click_item(a, b, c):
     pyautogui.click(x=x, y=y)  
 
 
-def isRealWindow(hWnd):
-    """Return True iff given window is a real Windows application window.
-    Didn't write this; not sure its used -notaspy 14-9-2020
-    """
-    if not win32gui.IsWindowVisible(hWnd):
-        return False
-    if win32gui.GetParent(hWnd) != 0:
-        return False
-    hasNoOwner = win32gui.GetWindow(hWnd, win32con.GW_OWNER) == 0
-    lExStyle = win32gui.GetWindowLong(hWnd, win32con.GWL_EXSTYLE)
-    if not (lExStyle & win32con.WS_EX_TOOLWINDOW == 0 and hasNoOwner):
-        if not (lExStyle & win32con.WS_EX_APPWINDOW != 0 and hasNoOwner):
-            if win32gui.GetWindowText(hWnd):
-                return True
-        return False
+# def isRealWindow(hWnd):
+#     """Return True iff given window is a real Windows application window.
+#     Didn't write this; not sure its used -notaspy 14-9-2020
+#     """
+#     if not win32gui.IsWindowVisible(hWnd):
+#         return False
+#     if win32gui.GetParent(hWnd) != 0:
+#         return False
+#     hasNoOwner = win32gui.GetWindow(hWnd, win32con.GW_OWNER) == 0
+#     lExStyle = win32gui.GetWindowLong(hWnd, win32con.GWL_EXSTYLE)
+#     if not (lExStyle & win32con.WS_EX_TOOLWINDOW == 0 and hasNoOwner):
+#         if not (lExStyle & win32con.WS_EX_APPWINDOW != 0 and hasNoOwner):
+#             if win32gui.GetWindowText(hWnd):
+#                 return True
+#         return False
 
 
-def getWindowSizes():
-    """
-    Return a list of tuples (handler, (width, height)) for each real window.
-    Didn't write this; not sure its used -notaspy 14-9-2020
-    """
+# def getWindowSizes():
+#     """
+#     Return a list of tuples (handler, (width, height)) for each real window.
+#     Didn't write this; not sure its used -notaspy 14-9-2020
+#     """
 
-    def callback(hWnd, windows):
-        if not isRealWindow(hWnd):
-            return
-        rect = win32gui.GetWindowRect(hWnd)
-        windows.append((hWnd, (rect[2] - rect[0], rect[3] - rect[1]), win32gui.GetWindowText(hWnd)))
+#     def callback(hWnd, windows):
+#         if not isRealWindow(hWnd):
+#             return
+#         rect = win32gui.GetWindowRect(hWnd)
+#         windows.append((hWnd, (rect[2] - rect[0], rect[3] - rect[1]), win32gui.GetWindowText(hWnd)))
 
-    windows = []
-    win32gui.EnumWindows(callback, windows)
-    return windows
+#     windows = []
+#     win32gui.EnumWindows(callback, windows)
+#     return windows
 
 
 class MyApplication(pygubu.TkApplication):
@@ -71,13 +69,17 @@ class MyApplication(pygubu.TkApplication):
         """
         This seems fine. -notaspy 14-9-2020
         """
+        if DEBUG:
+            pp.pprint("Initializing App")
         self.config = configparser.ConfigParser()
         self.config.read('setup.ini')
         super().__init__(master=master)
 
     def _create_ui(self):
+        if DEBUG:
+            pp.pprint("Creating UI")
         self.builder = builder = pygubu.Builder()
-        builder.add_from_file('./buttons/Gui_Button_V1.ui')
+        builder.add_from_file('Gui_Button_V1.ui')
         self.mainwindow = builder.get_object('Frame_1', self.master)
         self.font = font.Font(self.master, family="Times", size=20, weight="bold")
         builder.connect_callbacks(self)
@@ -91,6 +93,8 @@ class MyApplication(pygubu.TkApplication):
         self.setup_app()
 
     def setup_app(self):
+        if DEBUG:
+            pp.pprint("Setting up App")
         """
         We run this on initialization. This is a separate method so that we can reload the settings while app is running. It *might* cause some undesired effects. TBD
         """
@@ -124,7 +128,7 @@ class MyApplication(pygubu.TkApplication):
         # TODO: We can get the sizes of the items directly from the site, rather than hard coding them as below
         self.item_details = dict(
             Rings=[1, 1, '#33bbee', '4', int(self.config['Config']['threshold'])*2],
-            OneHandWeapons=[1, 3, '#bbbbbb', '1', int(self.config['Config']['threshold']*2)],
+            OneHandWeapons=[1, 3, '#bbbbbb', '1', int(self.config['Config']['threshold'])*2],
             BodyArmours=[2, 3, '#ee3377', '1', int(self.config['Config']['threshold'])],
             Helmets=[2, 2, '#cc3311', '2', int(self.config['Config']['threshold'])],
             Gloves=[2, 2, '#ee7733', '2', int(self.config['Config']['threshold'])],
@@ -346,7 +350,7 @@ class MyApplication(pygubu.TkApplication):
         """
         # TODO: make overly moveable again
         self.builder2 = pygubu.Builder()
-        self.builder2.add_from_file('./buttons/Gui_Button_V1.ui')
+        self.builder2.add_from_file('Gui_Button_V1.ui')
         self.top3 = tk.Toplevel(self.mainwindow)
         self.frame3 = self.builder2.get_object('Frame_2', self.top3)
         self.builder2.connect_callbacks(self)
@@ -377,11 +381,14 @@ class MyApplication(pygubu.TkApplication):
         if not self.synced:
             self.unident, self.ident = self.stash_finder()
             self.latest_stash = list((self.unident.copy(), self.ident.copy()))
-            self.update_filter()
+        if DEBUG:
+            pp.pprint("Refreshing filter within refresh me.")
             # unident, ident = self.stash_finder()
         for key, value in self.unident.items():
             alternative = len(self.ident.get(key, 0))
             exec(f'self.builder2.get_object("{key}").configure(text="{key[:4]}: {len(value)}/{alternative}")')
+        self.update_filter()
+
 
     def check_filter(self):
         """
@@ -424,6 +431,11 @@ class MyApplication(pygubu.TkApplication):
         a = requests.get(stash_tab, cookies=dict(POESESSID=(self.config['Config']['POESESSID'])))
         self.last_update = datetime.datetime.now()  #added by notaspy 14-9-2020
         # I am not sure the logic here. It is able to find the item coordinates, but it looks like it does it twice. Didn't mess with it
+        try:
+            json.loads(a.text)['items']
+        except KeyError:
+            Msg.showinfo(title='POE QoL', message='Bad Response from pathofexile.com. Please check your Setup file that the accoud and POESESSID are correct and current as a first step (and restart app if they needed to be changed).')
+            #TODO: log this error in a log file
         for x in json.loads(a.text)['items']:
             if x['name'] == '' and x['frameType'] != 3:
                 if 'BodyArmours' in x['icon']:
