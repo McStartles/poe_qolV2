@@ -377,12 +377,11 @@ class MyApplication(pygubu.TkApplication):
         if not self.synced:
             self.unident, self.ident = self.stash_finder()
             self.latest_stash = list((self.unident.copy(), self.ident.copy()))
-            # unident, ident = self.stash_finder()
-            for key, value in self.unident.items():
-                alternative = len(self.ident.get(key, 0))
-                exec(f'self.builder2.get_object("{key}").configure(text="{key[:4]}: {len(value)}/{alternative}")')
-
             self.update_filter()
+            # unident, ident = self.stash_finder()
+        for key, value in self.unident.items():
+            alternative = len(self.ident.get(key, 0))
+            exec(f'self.builder2.get_object("{key}").configure(text="{key[:4]}: {len(value)}/{alternative}")')
 
     def check_filter(self):
         """
