@@ -26,7 +26,7 @@ def click_item(a, b, c):
     Wish I knew how to make it 'click-through able'
     """
     a.destroy()
-    # exec(f"app.{a}.destroy()")  #legacy -notaspook 14-9-2020
+    # exec(f"app.{a}.destroy()")  #legacy -notaspy 14-9-2020
     x, y = pyautogui.position()
     pyautogui.click(x=x, y=y)  
 
@@ -84,11 +84,17 @@ class MyApplication(pygubu.TkApplication):
 
         # TODO: Create a method that reloads the Setup.ini file before executing certain methods so it can be updated on the fly
         # TODO: Validate the Setup.ini file contents and formatting and instruct user how to fix it if necessary
-        # TODO: Validate the default_filter.filter file contents and formatting and instruct user how to fix it if necessary
+        # TODO: Validate the chaos_items_filter.filter file contents and formatting and instruct user how to fix it if necessary
         # TODO: Restore the original main filter file one exit. I really am bad at handling exit callbacks
         # TODO: The overlay widget doesn't seem to sync with the local stash record (self.latest_stash)
-        # self.check_filter()  # This is legacy, to set the self.active_status parameter. I don't think that is needed anymore.
-        #Note to self,  from trying a bunch of different resolutions and 3 monitors i found that,
+        # self.check_filter()  # This is legacy, to set the self.active_status parameter. I don't think that is needed anymore
+        self.setup_app()
+
+    def setup_app(self):
+        """
+        We run this on initialization. This is a separate method so that we can reload the settings while app is running. It *might* cause some undesired effects. TBD
+        """
+                #Note to self,  from trying a bunch of different resolutions and 3 monitors i found that,
         # stash/inv tabs had a fixed width to height ratio of 886/1440 (~0.6153)that must be obeyed.
         self.screen_res = [int(dim) for dim in self.config['Config']['screen_res'].split('x')]
         if len(self.screen_res) != 2:
@@ -107,8 +113,6 @@ class MyApplication(pygubu.TkApplication):
         # store the dimensions of an individual stash tab box (could be rectangular for some resolutions, so we store width and height)
         self.box_width = (self.tab_end[0] - self.tab_origin[0]) / (box_density_scalar)
         self.box_height = (self.tab_end[1] - self.tab_origin[1]) / (box_density_scalar)
-        # Read the item filter text for the chaos recipe. This is used later for dynamically showing/hiding recipe items based on how many user has in tab
-        self.default_filter_sections = self.read_default_chaos_filter_sections()
         # Store some meta-data about each item slot
         # Probably better to use another data-structure other than a list of dicts
         # scheme is [normalized width,
@@ -147,13 +151,17 @@ class MyApplication(pygubu.TkApplication):
         # ~~~IMPORTANT~~~~: The remote snapshot and the local record are two separate dict parameters and a length-2 list of dicts. I need to change this for consistency
         # TODO: refactor remote snapshot and local record to be either both lists or both separate dicts for unidentified and identified items
         self.latest_stash = list((self.unident.copy(), self.ident.copy()))
+
+        # initialize data for app's filter algorithm
+        self.chaos_items_filter_sections = self.read_default_chaos_filter_sections()  # the custom formatting for items that match the chaos recipe
+        self.pre_process_item_filter()
         # initial dynamic filter update
         self.update_filter()
         # check if the local and remote inventories are synchronized. Uses the refresh rate (in seconds) set in the Setup.ini file.
         # I don't know the actual refresh rate of the website; seems random.
         # Probably fine to assume that the local record is most accurate for 60s since it should take about that long to vendor everything.
-        self.check_inventory_sync()
-        # Because of all the wonky `exec` calls, I am keeping track of the highlight overlay objects
+        self.check_inventory_sync()  # Can't remember why I do this here, but it doesn't hurt anything (lol only one day later and I can't remember yikes)
+        # Because of all the wonky `exec` calls, I am keeping track of the highlight overlay objects created by the self.chaos_recipe() method
         self.highlighted_items = []
 
     def run(self):
@@ -238,7 +246,7 @@ class MyApplication(pygubu.TkApplication):
                     exec(f'self.{x + str(i)}.geometry("{ceil(box_width)}x{ceil(box_height)}+{ceil(cord_x)}+{ceil(cord_y)}")')
                     exec(f'self.box = self.{x + str(i)}')
                     # was able to get rid of the legacy exec call below. Using the actual object fixes errors in destroying the highlight if highlighting over and over
-                    # exec(f'self.{x + str(i)}.bind("<Button-1>",lambda command, a=x,b=cord_x,c=cord_y: click_item(a,b,c))')  #legacy -notaspook 14-9-2020
+                    # exec(f'self.{x + str(i)}.bind("<Button-1>",lambda command, a=x,b=cord_x,c=cord_y: click_item(a,b,c))')  #legacy -notaspy 14-9-2020
                     self.box.bind("<Button-1>",lambda command, a=self.box,b=cord_x,c=cord_y: click_item(a,b,c))  #bind click command to object
                     # make sure the highlight objects persist so they are all interactive and can be deleted when method is run (see above, before loops)
                     self.highlighted_items.append(self.box)
@@ -246,7 +254,7 @@ class MyApplication(pygubu.TkApplication):
     def check_inventory_sync(self):
         """
         This is kinda useful. Checks if the local and remote stashes are the same OR if the user-give refresh interval has elapsed.
-        Sets and returns a bool. I made this. -notaspook 14-9-2020
+        Sets and returns a bool. I made this. -notaspy 14-9-2020
         """
         t_check = datetime.datetime.now()  # get current time
         t_previous_check = self.last_update  # we need to have this here since it is reset by the next call to self.stash_finder()
@@ -362,13 +370,18 @@ class MyApplication(pygubu.TkApplication):
         self.top3.destroy()
 
     def refresh_me(self):
-        # more legacy.  for the running counter. I tried to incorporate the syncing parameter, but didn't try hard on this yet.
-        unident, ident = self.stash_finder()
-        for key, value in unident.items():
-            alternative = len(ident.get(key, 0))
-            exec(f'self.builder2.get_object("{key}").configure(text="{key[:4]}: {len(value)}/{alternative}")')
+        # Refreshes the running count of unidentified and identified items in the stash tab.
+        # Fails silently if inventories are considered synced
+        # more legacy.  Tried harder to make this work better with the syncing scheme
         self.check_inventory_sync()
         if not self.synced:
+            self.unident, self.ident = self.stash_finder()
+            self.latest_stash = list((self.unident.copy(), self.ident.copy()))
+            # unident, ident = self.stash_finder()
+            for key, value in self.unident.items():
+                alternative = len(self.ident.get(key, 0))
+                exec(f'self.builder2.get_object("{key}").configure(text="{key[:4]}: {len(value)}/{alternative}")')
+
             self.update_filter()
 
     def check_filter(self):
@@ -410,7 +423,7 @@ class MyApplication(pygubu.TkApplication):
         pos_last_id = {'BodyArmours':[],  'Helmets':[],  'OneHandWeapons':[],  'Gloves':[],  'Boots':[],  'Amulets':[],  'Belts':[],  'Rings':[]}
         stash_tab = f"https://www.pathofexile.com/character-window/get-stash-items?league={self.config['Config']['league']}&tabIndex={self.config['Config']['tab']}&accountName={self.config['Config']['account']}"
         a = requests.get(stash_tab, cookies=dict(POESESSID=(self.config['Config']['POESESSID'])))
-        self.last_update = datetime.datetime.now()  #added by notaspook 14-9-2020
+        self.last_update = datetime.datetime.now()  #added by notaspy 14-9-2020
         # I am not sure the logic here. It is able to find the item coordinates, but it looks like it does it twice. Didn't mess with it
         for x in json.loads(a.text)['items']:
             if x['name'] == '' and x['frameType'] != 3:
@@ -480,14 +493,14 @@ class MyApplication(pygubu.TkApplication):
             return (pos_last_unid, pos_last_id)
 
     # below is some half-implemented code for dynamically updating a main filter file. Idea is to be able to use your normal filter along with this helper. 
-    # I could use some help/optimization here. -notaspook 14-9-2020
+    # I could use some help/optimization here. -notaspy 14-9-2020
     def read_default_chaos_filter_sections(self):
         """
         User can use the filter that comes with this program, or customize each slot to their liking.
         Only important things are that each section starts with a '#' and has the correct item slot name in that line
         Correct item slots are give in the self.item_details parameter. This should be the last word in the comment line.
         """
-        with open(self.config['Config']['default_filter'], 'r') as fil:
+        with open(self.config['Config']['chaos_items_filter'], 'r') as fil:
             chaos_filter = fil.readlines()  # read whole file into memory. each line is stored as a string in a list
             section_lines_start_end = []  # need a place to store where sections start and end
             section_starts = []
@@ -508,42 +521,51 @@ class MyApplication(pygubu.TkApplication):
             section_ends = [i for i in section_starts[1:]] + [len(chaos_filter)+1]
             # create empty dictionary for storing the text of each section
             sections = {}
-            # store the text for each section in the dictionary. The key for each section is the last word in the first line. This is maybe a dumb way of doing this and prone to user error.
+            # store the text for each section in the dictionary. The key for each section is the last word in the first line, chaos_filter[i].split(" ")[-1].rstrip(). This is maybe a dumb way of doing this and prone to user error.
             # TODO: Find a better way to get the section keys
             for i, j in zip(section_starts, section_ends):
-                sections[chaos_filter[i].split(" ")[-1].rstrip()] = chaos_filter[i:j]  # for key, separate line into list of words, ensure whitespace is stripped. Text is from starting to ending indices
+                sections[chaos_filter[i].split(" ")[-1].rstrip()] = chaos_filter[i:j]  # for each key, separate line into list of words, ensure whitespace is stripped. Text is from starting to ending indices
             if DEBUG:
                 pp.pprint(sections)
         return sections
 
-    def update_filter(self):
+    def pre_process_item_filter(self):
         """
-        Attempt to update the main filter with showing/hiding recipe item slots that have reached the threshold.
-        It is inefficient, since it loops through a very large filter blade file, and re-writes text that should not change. 
-        I re-insert all the text from the default_filter just to be safe, but wouldn't need to if this is implemented in a better way.
-        This will not hide any items set to be ignored in the Setup.ini file.
+        This accomplishes a few tasks that only need to be performed once on start up.
+        1) Determine if the included filter is in the users My Games\\Path of Exile\\ directory. If it exists we open it, and if not, we open the included default.
+        2) Open that file and find the starting and ending lines of the chaos recipe items and remember those for updating. These are bound by the random strings '234hn50987sd' and '2345ina8dsf7' respectively.
+        3) Store the parts of the item filter that don't change into memory. The current filter is small (~350kB), so we don't need to worry about memory. This saves from needing to ever read it again.
+        4) Insert the chaos_items_filter.filter contents into the filter text and write the file to the user's USERPROFILE\\Documents\\My Games\\Path of Exile\\ directory
+        We want to be reading and searching this file once.
         """
-        with open(self.config['Config']['filter'], 'r') as fil:
-            main_filter = fil.readlines()  # read file into memory
-            sections_start_line = 0  # start a line counter to find the section in the filter where we should insert the dynamic text from the default_filter file (see read_default_chaos_filter_sections())
-            sections_end_line = len(main_filter)
-            if DEBUG:
-                pp.pprint(self.config['Config']['filter'])
-                pp.pprint(f"Main filter start line:{sections_start_line}")
-                pp.pprint(f"Main filter end line:{sections_end_line}")
-            for i, line in enumerate(main_filter):
-                # I use a random string to find where the chaos recipe section begins and ends
-                # break after the end of the section has been found
-                if '234hn50987sd' in line:
-                    sections_start_line = i + 1
-                    if DEBUG:
-                        pp.pprint(f"Start of chaos recipe section found at line {sections_start_line}")
-                    continue
-                elif '2345ina8dsf7' in line:
-                    sections_end_line = i
-                    if DEBUG:
-                        pp.pprint(f"End of chaos recipe section found at line {sections_end_line}")
-                    break
+        #TODO: Maybe someone has a custom location for their item filters, so this search path probably shouldn't be hard coded like this
+        self.main_filter_path = os.path.join(os.environ['USERPROFILE'], "Documents", "My Games", "Path of Exile", self.config['Config']['filter'])
+        filter_exists = os.path.isfile(self.main_filter_path)
+        if filter_exists:
+            with open(self.config['Config']['filter'], 'r') as fil:
+                self.main_filter = fil.readlines()  # read file into memory
+        else:
+            # If it didn't exist, we will write it at the end of this method.
+            # Use the included default for now.
+            with open('POEQOL_Base.filter', 'r') as fil:
+                self.main_filter = fil.readlines()  # read default filter file into memory
+        self.chaos_items_sections_start_line = 0  # start a line counter to find the section in the filter where we should insert the dynamic text from the chaos_items_filter file (see read_default_chaos_filter_sections())
+        self.chaos_items_sections_end_line = len(self.main_filter)
+        for i, line in enumerate(self.main_filter):
+            # I use a random string to find where the chaos recipe section begins and ends
+            # break after the end of the section has been found
+            if line[0] != "#": # If the line isn't a comment, we can just move on
+                continue
+            elif '234hn50987sd' in line:
+                self.chaos_items_sections_start_line = i + 1
+                if DEBUG:
+                    pp.pprint(f"Start of chaos recipe section found at line {self.chaos_items_sections_start_line}")
+                continue
+            elif '2345ina8dsf7' in line:
+                self.chaos_items_sections_end_line = i
+                if DEBUG:
+                    pp.pprint(f"End of chaos recipe section found at line {self.chaos_items_sections_end_line}")
+                break
                 #TODO: This else clause should be implemented, but doesn't work right now
                 # else:
                 #     # If we cannot find the section. alert the user... with some vague, unhelpful instructions and return False. Didn't raise an error here, idk if I should
@@ -551,35 +573,51 @@ class MyApplication(pygubu.TkApplication):
                 #                                           'It should start with "# 234hn50987sd End Chaos Recipe Auto-Update Section" and end in "# 2345ina8dsf7 End Chaos Recipe Auto-Update Section".\n'+
                 #                                           'Msg @notaspy#6561 for help. 14-09-2020 \n')
                 #     return False
-                    if DEBUG:
-                        pp.pprint("The entire filter file was looped through. This should not happen.")
-            # take everything before and after the chaos recipe section from the original filter file. It shouldnt be changed
-            main_filter0 = main_filter[0:sections_start_line]
-            main_filter1 = main_filter[sections_end_line:]
+                if DEBUG:
+                    pp.pprint("The entire filter file was looped through. This should not happen.")
+        # take everything before and after the chaos recipe section from the original filter file. It shouldnt be changed ever. We will make changes between these two sections on each update.
+        self.main_filter0 = self.main_filter[0:self.chaos_items_sections_start_line]
+        self.main_filter1 = self.main_filter[self.chaos_items_sections_end_line:]
+        if not filter_exists:
+            with open(self.main_filter_path, 'w') as fil:
+                for line in self.main_filter:
+                    fil.write(line)
+        return self.main_filter
+
+    def update_filter(self):
+        """
+        Attempt to update the main filter with showing/hiding recipe item slots that have reached the threshold.
+        It is inefficient, since it loops through a very large filter blade file, and re-writes text that should not change. 
+        I re-insert all the text from the chaos_items_filter just to be safe, but wouldn't need to if this is implemented in a better way.
+        This will not hide any items set to be ignored in the Setup.ini file.
+        """
+        assert(self.main_filter)  # assert that a main filter was loaded
+        assert(self.main_filter0)  # assert that a main filter prefix exists
+        assert(self.main_filter1)  # assert that a main filter suffix exists
         # go through the item slots and their meta-data (which has the threshold for items set by user)
         for slot, details in self.item_details.items():
             try:
                 if len(self.latest_stash[0][slot]) < details[4]:  # if the number of items is greater than the threshold, keep it in the filter
-                    self.default_filter_sections[slot][1] = "Show\n" # The show/hide flag is the second entry in the filter section text (see default_filter in Setup.ini)
+                    self.chaos_items_filter_sections[slot][1] = "Show\n" # The show/hide flag is the second entry in the filter section text (see chaos_items_filter in Setup.ini)
                     if DEBUG:
                         pp.pprint(f"The filter will now show items of {slot} slot.")
                 else:
-                    self.default_filter_sections[slot][1] = "Hide\n"
+                    self.chaos_items_filter_sections[slot][1] = "Hide\n"
                     if DEBUG:
                         pp.pprint(f"The filter will now hide items of {slot} slot.")
             except (AttributeError, ValueError):  # Try to catch some errors. Not sure if this will work, don't have time to test the string formatting and message box
                 # TODO: Test this error message
                 Msg.showinfo(title='POE QoL', message=f'Check default filter formatting. There should be a valid entry for each item slot. The last word in each line should be one of the following: {[str(_[0]) for _ in self.item_details]}')
         # flatten the list of lists for the lines that should be added to the filter file
-        new_filter_lines = [l for slt in self.default_filter_sections.values() for l in slt]
+        new_filter_lines = [l for slt in self.chaos_items_filter_sections.values() for l in slt]
         if DEBUG:
-            pp.pprint(f"Text to be inserted into the user's main filter file between lines {sections_start_line} and {sections_end_line}")
+            pp.pprint(f"Text to be inserted into the user's main filter file between lines {self.chaos_items_sections_start_line} and {self.chaos_items_sections_end_line}")
             pp.pprint(new_filter_lines)
-        new_main_filter = main_filter0 + new_filter_lines + main_filter1
+        new_main_filter = self.main_filter0 + new_filter_lines + self.main_filter1
         if DEBUG:
-            pp.pprint((len(main_filter0), len(main_filter1), len(new_filter_lines)))
+            pp.pprint((len(self.main_filter0), len(self.main_filter1), len(new_filter_lines)))
         # TODO:enable the writing after testing
-        with open(self.config['Config']['filter'], 'w') as fil:
+        with open(self.main_filter_path, 'w') as fil:
             for line in new_main_filter:
                 fil.write(line)
         return True

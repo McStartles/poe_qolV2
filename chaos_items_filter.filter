@@ -1,0 +1,112 @@
+# Chaos Recipe Rings
+Show
+SetBorderColor 255 190 0
+SetFontSize 45
+ItemLevel >= 60
+Rarity Rare
+SetTextColor 0 0 255 255
+SetBackgroundColor 0 0 255 255
+MinimapIcon 2 Blue Circle
+PlayEffect Purple
+Class == "Rings"
+ItemLevel <= 74
+Identified False
+
+# Chaos Recipe Belts
+Show
+SetBorderColor 255 190 0
+SetFontSize 45
+ItemLevel >= 60
+Rarity Rare
+Class == "Belts"
+SetTextColor 0 167 47
+SetBackgroundColor 0 167 47
+MinimapIcon 2 Blue Circle
+PlayEffect Purple
+Identified False
+
+# Chaos Recipe Amulets
+Show
+SetBorderColor 255 190 0
+SetFontSize 45
+ItemLevel >= 60
+Rarity Rare
+SetTextColor 255 0 0 255
+SetBackgroundColor 255 0 0 255
+MinimapIcon 2 Blue Circle
+PlayEffect Purple
+Class == "Amulets"
+ItemLevel <= 74
+Identified False
+
+# Chaos Recipe Boots
+Show
+SetBorderColor 255 190 0
+SetFontSize 45
+ItemLevel >= 60
+Rarity Rare
+Class == "Boots"
+SetTextColor 30 200 200 255
+MinimapIcon 2 Blue Circle
+PlayEffect Purple
+SetBackgroundColor 30 200 200 255
+ItemLevel <= 74
+Identified False
+
+# Chaos Recipe Gloves
+Show
+SetBorderColor 255 190 0
+SetFontSize 45
+ItemLevel >= 60
+Rarity Rare
+Class == "Gloves"
+SetTextColor 210 178 135 255
+SetBackgroundColor 210 178 135 255
+MinimapIcon 2 Blue Circle
+PlayEffect Purple
+ItemLevel <= 74
+Identified False
+
+# Chaos Recipe Helmets
+Show
+SetBorderColor 255 190 0
+SetFontSize 45
+ItemLevel >= 60
+Rarity Rare
+Class == "Helmets"
+SetTextColor 175 96 37 255
+SetBackgroundColor 175 96 37 255
+MinimapIcon 2 Blue Circle
+PlayEffect Purple
+ItemLevel <= 74
+Identified False
+
+# Chaos Recipe BodyArmours
+Show
+SetBorderColor 255 190 0
+SetFontSize 45
+ItemLevel >= 60
+Rarity Rare
+Class == "Body Armours"
+SetTextColor 167 0 138
+SetBackgroundColor 167 0 138
+MinimapIcon 2 Blue Circle
+PlayEffect Purple
+ItemLevel <= 74
+Identified False
+
+# Chaos Recipe OneHandWeapons
+Show
+SetBorderColor 255 190 0
+SetFontSize 45
+ItemLevel >= 60
+Rarity Rare
+Class == "Bows" "Claws" "Daggers" "One Hand Axes" "One Hand Maces" "One Hand Swords" "Rune Daggers" "Sceptres" "Staves" "Thrusting One Hand Swords" "Two Hand Axes" "Two Hand Maces" "Two Hand Swords" "Wands" "Warstaves"
+ItemLevel <= 74
+Width <= 1
+Height <= 3
+SetTextColor 0 0 0 255
+SetBackgroundColor 0 0 0 255
+MinimapIcon 2 Blue Circle
+PlayEffect Purple
+Identified False
