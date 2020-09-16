@@ -5,7 +5,7 @@ SetFontSize 22
 ItemLevel >= 65
 Rarity = Rare
 SetTextColor 0 0 0
-SetBackgroundColor 238 51 119
+SetBackgroundColor 0 0 0
 Class "Body Armours"
 ItemLevel <= 74
 Identified False
@@ -16,8 +16,8 @@ SetBorderColor 48 255 0
 SetFontSize 28
 ItemLevel >= 65
 Rarity = Rare
-SetTextColor 0 0 0
-SetBackgroundColor 0 153 136
+SetTextColor 5 255 0
+SetBackgroundColor 48 255 0
 ItemLevel <= 74
 Class "Boots"
 Identified False
@@ -30,8 +30,8 @@ ItemLevel >= 65
 Rarity = Rare
 Class "Gloves"
 ItemLevel <= 74
-SetTextColor 0 0 0
-SetBackgroundColor 238 119 51
+SetTextColor 0 80 255
+SetBackgroundColor 0 16 255
 Identified False
 
 # Chaos Recipe Helmets
@@ -40,8 +40,8 @@ SetBorderColor 255 245 0
 SetFontSize 28
 ItemLevel >= 65
 Rarity = Rare
-SetTextColor 0 0 0
-SetBackgroundColor 204 51 17
+SetTextColor 244 255 0
+SetBackgroundColor 212 255 0
 Class "Helmets"
 ItemLevel <= 74
 Identified False
@@ -52,8 +52,8 @@ SetBorderColor 255 255 255
 SetFontSize 28
 ItemLevel >= 65
 Rarity = Rare
-SetTextColor 0 0 0
-SetBackgroundColor 187 187 187
+SetTextColor 255 255 255
+SetBackgroundColor 255 255 255
 Class "Daggers" "One Hand Axes" "One Hand Maces" "One Hand Swords" "Rune Daggers" "Sceptres" "Thrusting One Hand Swords" "Wands"
 ItemLevel <= 74
 Width = 1
@@ -66,8 +66,8 @@ SetBorderColor 255 0 0
 SetFontSize 40
 ItemLevel >= 65
 Rarity = Rare
-SetTextColor 0 0 0
-SetBackgroundColor 51 187 238
+SetTextColor 255 0 0
+SetBackgroundColor 255 0 0
 PlayAlertSound 16 300
 MinimapIcon 0 Red Star
 PlayEffect Red
@@ -81,8 +81,8 @@ SetBorderColor 255 0 0
 SetFontSize 40
 ItemLevel >= 65
 Rarity = Rare
-SetTextColor 0 0 0
-SetBackgroundColor 0 119 187
+SetTextColor 255 0 0
+SetBackgroundColor 255 0 0
 PlayAlertSound 16 300
 MinimapIcon 0 Red Star
 PlayEffect Red
@@ -96,8 +96,8 @@ SetBorderColor 255 0 0
 SetFontSize 40
 ItemLevel >= 65
 Rarity = Rare
-SetTextColor 0 0 0
-SetBackgroundColor 51 187 238
+SetTextColor 255 0 0
+SetBackgroundColor 255 0 0
 PlayAlertSound 16 300
 MinimapIcon 0 Red Star
 PlayEffect Red

@@ -123,14 +123,14 @@ class MyApplication(pygubu.TkApplication):
         #]
         # TODO: We can get the sizes of the items directly from the site, rather than hard coding them as below
         self.item_details = dict(
-            Rings=[1, 1, 'green2', '4', int(self.config['Config']['threshold'])*2],
-            OneHandWeapons=[1, 3, 'snow', '1', int(self.config['Config']['threshold']*2)],
-            BodyArmours=[2, 3, 'snow', '1', int(self.config['Config']['threshold'])],
-            Helmets=[2, 2, 'yellow', '2', int(self.config['Config']['threshold'])],
-            Gloves=[2, 2, 'yellow', '2', int(self.config['Config']['threshold'])],
-            Boots=[2, 2, 'yellow', '2', int(self.config['Config']['threshold'])],
-            Belts=[2, 1, 'cyan', '3', int(self.config['Config']['threshold'])],
-            Amulets=[1, 1, 'green2', '4', int(self.config['Config']['threshold'])],
+            Rings=[1, 1, '#33bbee', '4', int(self.config['Config']['threshold'])*2],
+            OneHandWeapons=[1, 3, '#bbbbbb', '1', int(self.config['Config']['threshold']*2)],
+            BodyArmours=[2, 3, '#ee3377', '1', int(self.config['Config']['threshold'])],
+            Helmets=[2, 2, '#cc3311', '2', int(self.config['Config']['threshold'])],
+            Gloves=[2, 2, '#ee7733', '2', int(self.config['Config']['threshold'])],
+            Boots=[2, 2, '#009988', '2', int(self.config['Config']['threshold'])],
+            Belts=[2, 1, '#0077bb', '3', int(self.config['Config']['threshold'])],
+            Amulets=[1, 1, '#33bbee', '4', int(self.config['Config']['threshold'])],
             )
         # below is legacy code for when the screen resolution was hard-coded -notaspy 14-9-2020
         ## if self.config['Config']['screen_res'] == '1920x1080':
@@ -596,11 +596,12 @@ class MyApplication(pygubu.TkApplication):
         # go through the item slots and their meta-data (which has the threshold for items set by user)
         for slot, details in self.item_details.items():
             try:
-                if len(self.latest_stash[0][slot]) < details[4]:  # if the number of items is greater than the threshold, keep it in the filter
+                # if the slot is on the ignor list or if the number of items is not greater than the threshold, keep it in the filter
+                if slot in self.config['Config']['ignore_threshold'] or len(self.latest_stash[0][slot]) < details[4]: 
                     self.chaos_items_filter_sections[slot][1] = "Show\n" # The show/hide flag is the second entry in the filter section text (see chaos_items_filter in Setup.ini)
                     if DEBUG:
                         pp.pprint(f"The filter will now show items of {slot} slot.")
-                else:
+                else:  # Otherwise hide that slot
                     self.chaos_items_filter_sections[slot][1] = "Hide\n"
                     if DEBUG:
                         pp.pprint(f"The filter will now hide items of {slot} slot.")

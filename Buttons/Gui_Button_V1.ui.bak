@@ -234,12 +234,14 @@
       <property name="row">0</property>
     </layout>
     <child>
-      <object id="OneHandWeapons" class="tk.Label">
-        <property name="background">#bbbbbb</property>
-        <property name="foreground">#000000</property>
+      <object id="Belts" class="tk.Label">
+        <property name="background">#00a72f</property>
+        <property name="disabledforeground">#ffffff</property>
+        <property name="foreground">#ffffff</property>
         <property name="height">2</property>
         <property name="height">2</property>
-        <property name="text" translatable="yes">Weapon</property>
+        <property name="state">disabled</property>
+        <property name="text" translatable="yes">Belt:</property>
         <property name="width">10</property>
         <layout>
           <property name="column">0</property>
@@ -249,12 +251,13 @@
       </object>
     </child>
     <child>
-      <object id="BodyArmours" class="tk.Label">
-        <property name="background">#ee3377</property>
-        <property name="foreground">#000000</property>
+      <object id="Rings" class="tk.Label">
+        <property name="background">#0000ff</property>
+        <property name="compound">top</property>
+        <property name="foreground">#ffffff</property>
         <property name="height">2</property>
         <property name="height">2</property>
-        <property name="text" translatable="yes">Armour</property>
+        <property name="text" translatable="yes">Ring:</property>
         <property name="width">10</property>
         <layout>
           <property name="column">1</property>
@@ -264,12 +267,13 @@
       </object>
     </child>
     <child>
-      <object id="Boots" class="tk.Label">
-        <property name="background">#009988</property>
-        <property name="foreground">#000000</property>
+      <object id="Amulets" class="tk.Label">
+        <property name="background">#ff0000</property>
+        <property name="disabledforeground">#ffffff</property>
+        <property name="foreground">#ffffff</property>
         <property name="height">2</property>
         <property name="height">2</property>
-        <property name="text" translatable="yes">Boot</property>
+        <property name="text" translatable="yes">Amulet: </property>
         <property name="width">10</property>
         <layout>
           <property name="column">2</property>
@@ -279,12 +283,12 @@
       </object>
     </child>
     <child>
-      <object id="Helmets" class="tk.Label">
-        <property name="background">#cc3311</property>
-        <property name="foreground">#000000</property>
+      <object id="Boots" class="tk.Label">
+        <property name="background">#1ec8c8</property>
+        <property name="foreground">#ffffff</property>
         <property name="height">2</property>
         <property name="height">2</property>
-        <property name="text" translatable="yes">Helmet</property>
+        <property name="text" translatable="yes">Boot</property>
         <property name="width">10</property>
         <layout>
           <property name="column">3</property>
@@ -295,8 +299,8 @@
     </child>
     <child>
       <object id="Gloves" class="tk.Label">
-        <property name="background">#ee7733</property>
-        <property name="foreground">#000000</property>
+        <property name="background">#d2b287</property>
+        <property name="foreground">#ffffff</property>
         <property name="height">2</property>
         <property name="height">2</property>
         <property name="text" translatable="yes">Glove</property>
@@ -309,14 +313,12 @@
       </object>
     </child>
     <child>
-      <object id="Belts" class="tk.Label">
-        <property name="background">#0077bb</property>
-        <property name="disabledforeground">#000000</property>
-        <property name="foreground">#000000</property>
+      <object id="Helmets" class="tk.Label">
+        <property name="background">#af6025</property>
+        <property name="foreground">#ffffff</property>
         <property name="height">2</property>
         <property name="height">2</property>
-        <property name="state">disabled</property>
-        <property name="text" translatable="yes">Belt:</property>
+        <property name="text" translatable="yes">Helmet</property>
         <property name="width">10</property>
         <layout>
           <property name="column">1</property>
@@ -326,13 +328,12 @@
       </object>
     </child>
     <child>
-      <object id="Amulets" class="tk.Label">
-        <property name="background">#33bbee</property>
-        <property name="disabledforeground">#ffffff</property>
-        <property name="foreground">#000000</property>
+      <object id="BodyArmours" class="tk.Label">
+        <property name="background">#a7008a</property>
+        <property name="foreground">#ffffff</property>
         <property name="height">2</property>
         <property name="height">2</property>
-        <property name="text" translatable="yes">Amulet: </property>
+        <property name="text" translatable="yes">Armour</property>
         <property name="width">10</property>
         <layout>
           <property name="column">2</property>
@@ -342,13 +343,12 @@
       </object>
     </child>
     <child>
-      <object id="Rings" class="tk.Label">
-        <property name="background">#33bbee</property>
-        <property name="compound">top</property>
-        <property name="foreground">#000000</property>
+      <object id="OneHandWeapons" class="tk.Label">
+        <property name="background">#000000</property>
+        <property name="foreground">#ffffff</property>
         <property name="height">2</property>
         <property name="height">2</property>
-        <property name="text" translatable="yes">Ring:</property>
+        <property name="text" translatable="yes">Weapon</property>
         <property name="width">10</property>
         <layout>
           <property name="column">3</property>
