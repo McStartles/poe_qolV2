@@ -1,22 +1,24 @@
 import tkinter as tk
 import tkinter.messagebox as Msg
+from tkinter import filedialog
 import pygubu, pyautogui
 from math import floor
 import requests, json, configparser
 from pygubu.builder import ttkstdwidgets
-import os
+import os, time
+from pathlib import Path
 from math import ceil
-import win32con, win32gui
+# import win32con, win32gui
 from tkinter import font
 import datetime
+import pyperclip
 
-DEBUG=False
-if DEBUG:
-    #TODO: Output to a log file instead of terminal
-    import sys
-    sys.stdout = open('logfile.txt', 'w')
-    import pprint
-    pp = pprint.PrettyPrinter(indent=4)
+def debug_app(debug_bool):
+        import sys
+        sys.stdout = open('poeqol2_logfile.txt', 'w')
+        import pprint
+        pp = pprint.PrettyPrinter(indent=4)
+        return pp
 
 def click_item(a, b, c):
     """
@@ -29,57 +31,31 @@ def click_item(a, b, c):
     pyautogui.click(x=x, y=y)  
 
 
-# def isRealWindow(hWnd):
-#     """Return True iff given window is a real Windows application window.
-#     Didn't write this; not sure its used -notaspy 14-9-2020
-#     """
-#     if not win32gui.IsWindowVisible(hWnd):
-#         return False
-#     if win32gui.GetParent(hWnd) != 0:
-#         return False
-#     hasNoOwner = win32gui.GetWindow(hWnd, win32con.GW_OWNER) == 0
-#     lExStyle = win32gui.GetWindowLong(hWnd, win32con.GWL_EXSTYLE)
-#     if not (lExStyle & win32con.WS_EX_TOOLWINDOW == 0 and hasNoOwner):
-#         if not (lExStyle & win32con.WS_EX_APPWINDOW != 0 and hasNoOwner):
-#             if win32gui.GetWindowText(hWnd):
-#                 return True
-#         return False
-
-
-# def getWindowSizes():
-#     """
-#     Return a list of tuples (handler, (width, height)) for each real window.
-#     Didn't write this; not sure its used -notaspy 14-9-2020
-#     """
-
-#     def callback(hWnd, windows):
-#         if not isRealWindow(hWnd):
-#             return
-#         rect = win32gui.GetWindowRect(hWnd)
-#         windows.append((hWnd, (rect[2] - rect[0], rect[3] - rect[1]), win32gui.GetWindowText(hWnd)))
-
-#     windows = []
-#     win32gui.EnumWindows(callback, windows)
-#     return windows
-
-
 class MyApplication(pygubu.TkApplication):
 
     def __init__(self, master=None):
         """
         This seems fine. -notaspy 14-9-2020
         """
-        if DEBUG:
-            pp.pprint("Initializing App")
         self.config = configparser.ConfigParser()
         self.config.read('setup.ini')
+
+        DEBUG = (self.config['Config']['debug'].lower() == 'true' or 'y' in self.config['Config']['debug'].lower() or self.config['Config']['debug'].lower() != 0)
+        if DEBUG:
+            self.DEBUG = True
+            self.pp = debug_app(debug_bool=DEBUG)
+            self.pp.pprint("Setting up App")
+            self.pp.pprint("Initializing App")
+        else:
+            self.DEBUG = False
         super().__init__(master=master)
 
     def _create_ui(self):
-        if DEBUG:
-            pp.pprint("Creating UI")
+        if self.DEBUG:
+            self.pp.pprint("Creating UI")
         self.builder = builder = pygubu.Builder()
-        builder.add_from_file('Gui_Button_V1.ui')
+        builder.add_resource_path('.')
+        builder.add_from_file('Gui_Button_V2.ui')
         self.mainwindow = builder.get_object('Frame_1', self.master)
         self.font = font.Font(self.master, family="Times", size=20, weight="bold")
         builder.connect_callbacks(self)
@@ -93,12 +69,13 @@ class MyApplication(pygubu.TkApplication):
         self.setup_app()
 
     def setup_app(self):
-        if DEBUG:
-            pp.pprint("Setting up App")
+
         """
         We run this on initialization. This is a separate method so that we can reload the settings while app is running. It *might* cause some undesired effects. TBD
         """
-                #Note to self,  from trying a bunch of different resolutions and 3 monitors i found that,
+        if self.DEBUG:
+            self.pp.pprint("Setting Up App")
+        #Note to self,  from trying a bunch of different resolutions and 3 monitors i found that,
         # stash/inv tabs had a fixed width to height ratio of 886/1440 (~0.6153)that must be obeyed.
         self.screen_res = [int(dim) for dim in self.config['Config']['screen_res'].split('x')]
         if len(self.screen_res) != 2:
@@ -167,6 +144,8 @@ class MyApplication(pygubu.TkApplication):
         self.check_inventory_sync()  # Can't remember why I do this here, but it doesn't hurt anything (lol only one day later and I can't remember yikes)
         # Because of all the wonky `exec` calls, I am keeping track of the highlight overlay objects created by the self.chaos_recipe() method
         self.highlighted_items = []
+        if self.DEBUG:   
+            self.pp.pprint("Done setting up App")
 
     def run(self):
         """Run the main loop. Self explanatory."""
@@ -220,9 +199,9 @@ class MyApplication(pygubu.TkApplication):
 
             # loop through each item slot (key)
             for x in unident:
-                if DEBUG:
-                    pp.pprint(('Item Slot:', x))
-                    pp.pprint(('Item coordinates', unident[x]))
+                if self.DEBUG:
+                    self.pp.pprint(('Item Slot:', x))
+                    self.pp.pprint(('Item coordinates', unident[x]))
                 # we will count from the top-left origin
                 x_off = self.tab_origin[0]
                 y_off = self.tab_origin[1]
@@ -234,12 +213,12 @@ class MyApplication(pygubu.TkApplication):
                     cord_x, cord_y = unident[x][i]  # get coordinates of entry
                     cord_x = cord_x * self.box_width + x_off  # convert coordinates to pixels
                     cord_y = cord_y * self.box_height + y_off
-                    if DEBUG:
-                        pp.pprint(('Screen Coordinates:',(cord_x, cord_y)))
+                    if self.DEBUG:
+                        self.pp.pprint(('Screen Coordinates:',(cord_x, cord_y)))
                     box_width = self.box_width * self.item_details[x][0]  # based on the meta-data about item size in self.item_details, make appropriate size box
                     box_height = self.box_height * self.item_details[x][1]
-                    if DEBUG:       
-                        pp.pprint(('Box dimensions (pixels):',(box_width, box_height)))
+                    if self.DEBUG:       
+                        self.pp.pprint(('Box dimensions (pixels):',(box_width, box_height)))
                     # below is legacy
                     # basically it creates a semi-transparent top level window that disappears when it is clicked. I decided to use different colors by item slot
                     exec(f"self.{x + str(i)} = tk.Toplevel(self.mainwindow)")
@@ -268,8 +247,8 @@ class MyApplication(pygubu.TkApplication):
             self.synced = True
         else:
             self.synced = False
-        if DEBUG:
-            pp.pprint(f"Synced?: {self.synced}")
+        if self.DEBUG:
+            self.pp.pprint(f"Synced?: {self.synced}")
         return self.synced
 
     def check_complete_set(self):
@@ -281,8 +260,8 @@ class MyApplication(pygubu.TkApplication):
         if not self.check_inventory_sync():
             self.unident, self.ident = self.stash_finder()
             self.latest_stash = (self.unident, self.ident)
-            if DEBUG:
-                pp.pprint(self.unident)
+            if self.DEBUG:
+                self.pp.pprint(self.unident)
         # legacy test for existance of the attributes. kinda tried to refactor it. Functional but not pretty. 
         # Notice the different syntax for the remote snapshot and the local record (ie local is a list of dicts)
         try:
@@ -311,8 +290,8 @@ class MyApplication(pygubu.TkApplication):
                     unident_sets = {_key:[] for _key in self.item_details.keys()}  # create a dictionary of empty lists to fill in and return
                     # loop through each slot and find the maximum index in the list of coordinates for each item. We use this to only take the valid items.
                     for key in self.item_details.keys():
-                        if DEBUG:
-                            pp.pprint(f"Item Slot name for item in {max_sets} complete sets: {key}")
+                        if self.DEBUG:
+                            self.pp.pprint(f"Item Slot name for item in {max_sets} complete sets: {key}")
                         if key in ["Rings", "OneHandWeapons"]:  # we need two of these, so the maximum index is twice that of the other items
                             max_index = 2 * max_sets
                         else:
@@ -321,14 +300,14 @@ class MyApplication(pygubu.TkApplication):
                         # I think we don't want to 'pop' the item from the list because the loop will then try to access indexes that are outside the list length
                         for i in range(max_index):
                             unident_sets[key].append(self.latest_stash[0][key][i].copy())
-                            if DEBUG:
-                                pp.pprint(f"Item of slot {key}, item number {i} passed to highlighting method self.chaos_recipe(): {unident_sets[key][-1]}")
+                            if self.DEBUG:
+                                self.pp.pprint(f"Item of slot {key}, item number {i} passed to highlighting method self.chaos_recipe(): {unident_sets[key][-1]}")
                     # Now remove these from the local inventory record. This could be more efficient by combining with the above, I am sure
                     # TODO: This logic needs testing and scrutiny. I am not 100% sure it is doing what I think it is.
                     for key in self.item_details.keys():
                         indices_to_delete = []
-                        if DEBUG:
-                            pp.pprint((f"self.latest_stash entry of {key}:", self.latest_stash[0][key]))
+                        if self.DEBUG:
+                            self.pp.pprint((f"self.latest_stash entry of {key}:", self.latest_stash[0][key]))
                         for i in range(len(self.latest_stash[0][key])):
                             if self.latest_stash[0][key][i] in unident_sets[key]:
                                 indices_to_delete.append(i)
@@ -350,16 +329,33 @@ class MyApplication(pygubu.TkApplication):
         """
         # TODO: make overly moveable again
         self.builder2 = pygubu.Builder()
-        self.builder2.add_from_file('Gui_Button_V1.ui')
+        self.builder2.add_from_file('Gui_Button_V2.ui')
         self.top3 = tk.Toplevel(self.mainwindow)
+        # self.top3 = tk.Toplevel(self.mainwindow)
         self.frame3 = self.builder2.get_object('Frame_2', self.top3)
         self.builder2.connect_callbacks(self)
         self.top3.overrideredirect(1)
+        print(self.top3.__dict__)
         # I went ahead and put this at bottom center
         overlay_location = f'+{self.screen_res[0] // 2 - 130}+{floor(self.screen_res[1] * (1 - 80/1080))}'
         self.top3.geometry(overlay_location)
-        if DEBUG:
-            pp.pprint(f'Overlay Location:{overlay_location}')
+        self.top3._offsetx = 260
+        self.top3._offsety = 80
+
+        def clickwin(event):
+            self.top3._offsetx = event.x
+            self.top3._offsety = event.y
+        def move_overlay(event):
+            x = round(self.top3.winfo_pointerx() - self.top3._offsetx)
+            y = round(self.top3.winfo_pointery() - self.top3._offsety)
+            print(x, y)
+            self.top3.geometry('+{x}+{y}'.format(x=x,y=y))
+        self.top3.clickwin = clickwin
+        self.top3.move_overlay = move_overlay
+        self.top3.bind('<Button-1>',self.top3.clickwin)
+        self.top3.bind('<B1-Motion>',self.top3.move_overlay)
+        if self.DEBUG:
+            self.pp.pprint(f'Overlay Location:{overlay_location}')
         # if self.config['Config']['screen_res'] == '1920x1018':
         #     self.top3.geometry('+1180+900')
         # elif self.config['Config']['screen_res'] == '1920x1080':
@@ -373,6 +369,14 @@ class MyApplication(pygubu.TkApplication):
         # more legacy for overlay
         self.top3.destroy()
 
+
+    # def move_overlay(self, event):
+    #     x = self.top3.winfo_pointerx() - self.top3._offsetx
+    #     y = self.top3.winfo_pointery() - self.top3._offsety
+    #     print(x, y)
+    #     self.top3.geometry('+{x}+{y}'.format(x=x,y=y))
+
+
     def refresh_me(self):
         # Refreshes the running count of unidentified and identified items in the stash tab.
         # Fails silently if inventories are considered synced
@@ -381,12 +385,17 @@ class MyApplication(pygubu.TkApplication):
         if not self.synced:
             self.unident, self.ident = self.stash_finder()
             self.latest_stash = list((self.unident.copy(), self.ident.copy()))
-        if DEBUG:
-            pp.pprint("Refreshing filter within refresh me.")
+        if self.DEBUG:
+            self.pp.pprint("Refreshing filter within refresh me.")
             # unident, ident = self.stash_finder()
         for key, value in self.unident.items():
             alternative = len(self.ident.get(key, 0))
             exec(f'self.builder2.get_object("{key}").configure(text="{key[:4]}: {len(value)}/{alternative}")')
+        if self.DEBUG:
+            self.pp.pprint("Printing Out Latest Stash:")
+            self.pp.pprint(self.latest_stash)
+            self.pp.pprint("Printing Out Latest Snapshot:")
+            self.pp.pprint(self.unident)
         self.update_filter()
 
 
@@ -427,8 +436,28 @@ class MyApplication(pygubu.TkApplication):
         """
         pos_last_unid = {'BodyArmours':[],  'Helmets':[],  'OneHandWeapons':[],  'Gloves':[],  'Boots':[],  'Amulets':[],  'Belts':[],  'Rings':[]}
         pos_last_id = {'BodyArmours':[],  'Helmets':[],  'OneHandWeapons':[],  'Gloves':[],  'Boots':[],  'Amulets':[],  'Belts':[],  'Rings':[]}
+
         stash_tab = f"https://www.pathofexile.com/character-window/get-stash-items?league={self.config['Config']['league']}&tabIndex={self.config['Config']['tab']}&accountName={self.config['Config']['account']}"
-        a = requests.get(stash_tab, cookies=dict(POESESSID=(self.config['Config']['POESESSID'])))
+        payload = {
+        'league': self.config['Config']['league'],
+        'tabIndex': self.config['Config']['tab'],
+        'accountName': self.config['Config']['account'].encode('utf-8'),
+        }
+        if self.DEBUG:
+            self.pp.pprint("Pulling from pathofexile.com")
+            self.pp.pprint("trying payload: {}".format(payload))
+            self.pp.pprint(f"trying: {stash_tab}")
+        try:
+            a = requests.get(stash_tab, cookies=dict(POESESSID=(self.config['Config']['POESESSID'])), params=payload)
+        except requests.HTTPError as exception:
+            Msg.showinfo(title='POE QoL', message='Could not connect to pathofexile.com.')
+
+        if self.DEBUG:
+            try:
+                self.pp.pprint("json retrieved:")
+                self.pp.pprint(json.loads(a.text)['items'])
+            except:  # I have no clue what error types might return here, but I want to output something to log file
+                self.pp.pprint("JSON could not be output to logfile.")
         self.last_update = datetime.datetime.now()  #added by notaspy 14-9-2020
         # I am not sure the logic here. It is able to find the item coordinates, but it looks like it does it twice. Didn't mess with it
         try:
@@ -482,25 +511,6 @@ class MyApplication(pygubu.TkApplication):
                                                 if 'Rings' in x['icon']:
                                                     pos_last_id['Rings'].append([x['x'], x['y']])
         else:
-        ## I commented this out because I haven't gotten to the point of re-implementing the dynamic filter completely. Highlighting works without it.
-        ## I don't know why we needed a for-else here
-        #     self.change_filtering = 0
-        #     for key, value in pos_last_unid.items():
-        #         if key not in self.config['Config']['ignore_threshold']:
-        #             tempvar = self.active_status[key]
-        #             if len(value) >= int(self.config['Config']['threshold']) and tempvar[1][:4] == 'Show':
-        #                 self.change_filtering = 1
-        #                 self.active_status[key] = [tempvar[0], 'Hide\n']
-        #             else:
-        #                 if len(value) < int(self.config['Config']['threshold']):
-        #                     if tempvar[1][:4] == 'Hide':
-        #                         self.change_filtering = 1
-        #                         self.active_status[key] = [tempvar[0], 'Show\n']
-        #     else:
-        #         if self.change_filtering == 1:
-        #             self.filter_find()
-                # return (pos_last_unid, pos_last_id)
-            # return the remote stash tab snapshot
             return (pos_last_unid, pos_last_id)
 
     # below is some half-implemented code for dynamically updating a main filter file. Idea is to be able to use your normal filter along with this helper. 
@@ -519,11 +529,11 @@ class MyApplication(pygubu.TkApplication):
                 _line = line.lstrip()  # remove any leading white space
                 # If the line is a comment, record that as the start of an item slot section
                 # We need to protect from empty lines which are stored as zero-length lists
-                if DEBUG:
-                    pp.pprint(("Default Filter Line as read:", _line))
-                    pp.pprint(("Result of bool test for empty line:", not _line))
+                if self.DEBUG:
+                    self.pp.pprint(("Default Filter Line as read:", _line))
+                    self.pp.pprint(("Result of bool test for empty line:", not _line))
                     if _line:
-                        pp.pprint(("Result of bool test for comment:", not _line[0] == "#"))
+                        self.pp.pprint(("Result of bool test for comment:", not _line[0] == "#"))
                 if not _line or not _line[0] == "#":
                     continue  
                 elif  _line and _line[0] == "#":  # I shouldn't need to, but I double check that the line is a comment anyway
@@ -533,11 +543,27 @@ class MyApplication(pygubu.TkApplication):
             # create empty dictionary for storing the text of each section
             sections = {}
             # store the text for each section in the dictionary. The key for each section is the last word in the first line, chaos_filter[i].split(" ")[-1].rstrip(). This is maybe a dumb way of doing this and prone to user error.
-            # TODO: Find a better way to get the section keys
+            # TODO: Find a better way to get the section keys -- Update, trying this below now.
             for i, j in zip(section_starts, section_ends):
-                sections[chaos_filter[i].split(" ")[-1].rstrip()] = chaos_filter[i:j]  # for each key, separate line into list of words, ensure whitespace is stripped. Text is from starting to ending indices
-            if DEBUG:
-                pp.pprint(sections)
+                # sections[chaos_filter[i].split(" ")[-1].rstrip()] = chaos_filter[i:j]  # for each key, separate line into list of words, ensure whitespace is stripped. Text is from starting to ending indices
+                for k in range(i, j-1):  #loop through all the lines in the section
+                    print(k)
+                    linelistcopy = chaos_filter[k][:].split(" ") # create a copy to work with and remove white space and make a list
+                    linelistcopy = [str(_).rstrip().replace("'", '') for _ in linelistcopy] # convert to strings wihtout quotes...?
+                    linelistcopy = [_.replace('"', '') for _ in linelistcopy] # convert to strings wihtout quotes...?
+                    print("HELLO")
+                    self.pp.pprint(linelistcopy)
+                    if linelistcopy[0].lower() == 'class':
+                        if "One" in linelistcopy and  "Hand" in linelistcopy:
+                            section_class_key = "OneHandWeapons"
+                        elif linelistcopy[1].lower() == 'body':
+                            section_class_key = "BodyArmours"
+                        else:
+                            section_class_key = linelistcopy[1]
+                sections[section_class_key.rstrip()] = chaos_filter[i:j]
+
+            if self.DEBUG:
+                self.pp.pprint(sections)
         return sections
 
     def pre_process_item_filter(self):
@@ -550,16 +576,53 @@ class MyApplication(pygubu.TkApplication):
         We want to be reading and searching this file once.
         """
         #TODO: Maybe someone has a custom location for their item filters, so this search path probably shouldn't be hard coded like this
-        self.main_filter_path = os.path.join(os.environ['USERPROFILE'], "Documents", "My Games", "Path of Exile", self.config['Config']['filter'])
+        # self.main_filter_path = os.path.join(os.environ['USERPROFILE'], "Documents", "My Games", "Path of Exile", self.config['Config']['filter'])
+        user_path = Path.home()  # Get the user home directory to look for the POE filters directory
+        if os.path.isabs(self.config['Config']['filter']):  # if the path given is absolute, lets try it as is, else let stry to figure some more information about the location
+            self.main_filter_path = self.config['Config']['filter']
+            path_pre = os.path.split(self.main_filter_path)
+        else:
+            # path_suf = os.path.relpath(os.path.join("My Games", "Path of Exile", self.config['Config']['filter']), start=user_path)  # handle if the user put in a full path or other extra information
+            path_pre = os.path.commonprefix([os.path.join(user_path, "Documents", "My Games", "Path of Exile"), self.config['Config']['filter']])  # handle if the user put in a full path or other extra information
+            path_to_filter = os.path.join(path_pre, self.config['Config']['filter'])
+            self.main_filter_path = path_to_filter
+        if self.DEBUG:
+            self.pp.pprint(f"Path Suffix: {path_pre}\n")
+            self.pp.pprint(f"Searching for filter:\n {self.main_filter_path}\n")
         filter_exists = os.path.isfile(self.main_filter_path)
+        def_filter_path = os.path.abspath(self.main_filter_path)
         if filter_exists:
-            with open(self.config['Config']['filter'], 'r') as fil:
-                self.main_filter = fil.readlines()  # read file into memory
+            with open(def_filter_path, 'r') as fil:
+                self.main_filter = fil.readlines()  # read default file into memory
+            if self.DEBUG:
+                self.pp.pprint(f"Found filter:")
+                # self.pp.pprint(self.main_filter)
         else:
             # If it didn't exist, we will write it at the end of this method.
             # Use the included default for now.
+            Msg.showinfo('POE QoL', f'POE QoL could not find a filter at {self.main_filter_path}.\n\nPlease select the folder where your pathofexile fitlers are located to create a new filter named "POEQOL_Base.filter" based on the filter of the same name in this directory.')
+            self.main_filter_path = os.path.normpath(os.path.join(filedialog.askdirectory(), 'POEQOL_Base.filter'))
             with open('POEQOL_Base.filter', 'r') as fil:
+                if self.DEBUG:
+                    self.pp.pprint(f"Could not find the filter as indicated in config file at: {def_filter_path}")
+                    self.pp.pprint("User has selected {} to write the default filter:".format(self.main_filter_path))
                 self.main_filter = fil.readlines()  # read default filter file into memory
+        # we are now just going to update the setup file with what the user says to avoid errors in the future
+        config_file_updates = {'filter':{'path': self.main_filter_path, 'lino': None, 'field':'filter='}}
+        with open('Setup.ini', 'r', encoding='utf-8') as configfile_in:
+            contents0 = configfile_in.readlines()
+            for lino, l in enumerate(contents0):
+                if l[0:7] == 'filter=':
+                    config_file_updates['filter']['lino'] = lino 
+                else:
+                    continue
+        with open('Setup.ini', 'w', encoding='utf-8') as configfile_out:
+            contents0[config_file_updates['filter']['lino']] = config_file_updates['filter']['field'] + config_file_updates['filter']['path'] + "\n" # encode it at utf-8 for international players
+            print(contents0)
+            for l in contents0:
+                configfile_out.write(l)
+
+
         self.chaos_items_sections_start_line = 0  # start a line counter to find the section in the filter where we should insert the dynamic text from the chaos_items_filter file (see read_default_chaos_filter_sections())
         self.chaos_items_sections_end_line = len(self.main_filter)
         for i, line in enumerate(self.main_filter):
@@ -569,13 +632,13 @@ class MyApplication(pygubu.TkApplication):
                 continue
             elif '234hn50987sd' in line:
                 self.chaos_items_sections_start_line = i + 1
-                if DEBUG:
-                    pp.pprint(f"Start of chaos recipe section found at line {self.chaos_items_sections_start_line}")
+                if self.DEBUG:
+                    self.pp.pprint(f"Start of chaos recipe section found at line {self.chaos_items_sections_start_line}")
                 continue
             elif '2345ina8dsf7' in line:
                 self.chaos_items_sections_end_line = i
-                if DEBUG:
-                    pp.pprint(f"End of chaos recipe section found at line {self.chaos_items_sections_end_line}")
+                if self.DEBUG:
+                    self.pp.pprint(f"End of chaos recipe section found at line {self.chaos_items_sections_end_line}")
                 break
                 #TODO: This else clause should be implemented, but doesn't work right now
                 # else:
@@ -584,11 +647,11 @@ class MyApplication(pygubu.TkApplication):
                 #                                           'It should start with "# 234hn50987sd End Chaos Recipe Auto-Update Section" and end in "# 2345ina8dsf7 End Chaos Recipe Auto-Update Section".\n'+
                 #                                           'Msg @notaspy#6561 for help. 14-09-2020 \n')
                 #     return False
-                if DEBUG:
-                    pp.pprint("The entire filter file was looped through. This should not happen.")
+                if self.DEBUG:
+                    self.pp.pprint("The entire filter file was looped through. This should not happen.")
         # take everything before and after the chaos recipe section from the original filter file. It shouldnt be changed ever. We will make changes between these two sections on each update.
-        self.main_filter0 = self.main_filter[0:self.chaos_items_sections_start_line]
-        self.main_filter1 = self.main_filter[self.chaos_items_sections_end_line:]
+        self.main_filter0 = self.main_filter[0:self.chaos_items_sections_start_line] + ['\n']
+        self.main_filter1 = ['\n'] + self.main_filter[self.chaos_items_sections_end_line:] + ['\n']
         if not filter_exists:
             with open(self.main_filter_path, 'w') as fil:
                 for line in self.main_filter:
@@ -602,32 +665,36 @@ class MyApplication(pygubu.TkApplication):
         I re-insert all the text from the chaos_items_filter just to be safe, but wouldn't need to if this is implemented in a better way.
         This will not hide any items set to be ignored in the Setup.ini file.
         """
+        if self.DEBUG:
+            self.pp.pprint("Trying to update Filter.")
         assert(self.main_filter)  # assert that a main filter was loaded
         assert(self.main_filter0)  # assert that a main filter prefix exists
         assert(self.main_filter1)  # assert that a main filter suffix exists
+        if self.DEBUG:
+            self.pp.pprint("Found necessary filter files.")        
         # go through the item slots and their meta-data (which has the threshold for items set by user)
         for slot, details in self.item_details.items():
             try:
                 # if the slot is on the ignor list or if the number of items is not greater than the threshold, keep it in the filter
                 if slot in self.config['Config']['ignore_threshold'] or len(self.latest_stash[0][slot]) < details[4]: 
                     self.chaos_items_filter_sections[slot][1] = "Show\n" # The show/hide flag is the second entry in the filter section text (see chaos_items_filter in Setup.ini)
-                    if DEBUG:
-                        pp.pprint(f"The filter will now show items of {slot} slot.")
+                    if self.DEBUG:
+                        self.pp.pprint(f"Found {len(self.latest_stash[0][slot])} items and ignore_threshold is set to {self.config['Config']['ignore_threshold']}. The filter will now show items of {slot} slot.")
                 else:  # Otherwise hide that slot
                     self.chaos_items_filter_sections[slot][1] = "Hide\n"
-                    if DEBUG:
-                        pp.pprint(f"The filter will now hide items of {slot} slot.")
+                    if self.DEBUG:
+                        self.pp.pprint(f"Found {len(self.latest_stash[0][slot])} items and ignore_threshold is set to {self.config['Config']['ignore_threshold']}. The filter will now show items of {slot} slot.")
             except (AttributeError, ValueError):  # Try to catch some errors. Not sure if this will work, don't have time to test the string formatting and message box
                 # TODO: Test this error message
                 Msg.showinfo(title='POE QoL', message=f'Check default filter formatting. There should be a valid entry for each item slot. The last word in each line should be one of the following: {[str(_[0]) for _ in self.item_details]}')
         # flatten the list of lists for the lines that should be added to the filter file
         new_filter_lines = [l for slt in self.chaos_items_filter_sections.values() for l in slt]
-        if DEBUG:
-            pp.pprint(f"Text to be inserted into the user's main filter file between lines {self.chaos_items_sections_start_line} and {self.chaos_items_sections_end_line}")
-            pp.pprint(new_filter_lines)
+        if self.DEBUG:
+            self.pp.pprint(f"Text to be inserted into the user's main filter file between lines {self.chaos_items_sections_start_line} and {self.chaos_items_sections_end_line}")
+            self.pp.pprint(new_filter_lines)
         new_main_filter = self.main_filter0 + new_filter_lines + self.main_filter1
-        if DEBUG:
-            pp.pprint((len(self.main_filter0), len(self.main_filter1), len(new_filter_lines)))
+        if self.DEBUG:
+            self.pp.pprint((len(self.main_filter0), len(self.main_filter1), len(new_filter_lines)))
         # TODO:enable the writing after testing
         with open(self.main_filter_path, 'w') as fil:
             for line in new_main_filter:
@@ -636,9 +703,13 @@ class MyApplication(pygubu.TkApplication):
 
     #Below are just methods that will search the stash tab for common things. didn't mess with these -notaspy 14-9-2020
     def search(self, text):
-        pyautogui.click(x=ceil(self.screen_res[0] * .1), y=ceil(self.screen_res[1] * .5))
+        pyperclip.copy(text)
+        x, y = pyautogui.position()
+        pyautogui.click(x= floor(self.tab_end[0] * 19/24), y=floor(self.tab_end[1] * 1183/1057))
+        pyautogui.moveTo(x=x, y=y)
         pyautogui.hotkey('ctrl', 'f')
-        pyautogui.typewrite(text)
+        pyautogui.hotkey('ctrl', 'v')
+
 
     def currency(self):
         self.search('"currency"')
